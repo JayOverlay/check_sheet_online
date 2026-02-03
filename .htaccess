@@ -1,0 +1,22 @@
+RewriteEngine On
+RewriteBase /check_sheet_online/
+
+# 1. Hide .php extension (External Redirect)
+RewriteCond %{REQUEST_METHOD} GET
+RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /check_sheet_online/([^\ ]+)\.php
+RewriteRule ^([^\.]+)\.php$ $1 [L,R=301]
+
+# 2. Check for pages in 'pages/' directory
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/check_sheet_online/pages/$1.php -f
+RewriteRule ^([^/]+)$ pages/$1.php [L]
+
+# 3. Check for actions in 'actions/' directory
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/check_sheet_online/actions/$1.php -f
+RewriteRule ^([^/]+)$ actions/$1.php [L]
+
+# 4. Check for pages in Root (like login, index)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^([^/]+)$ $1.php [L]

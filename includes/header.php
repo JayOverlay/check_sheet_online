@@ -1,0 +1,116 @@
+<?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login");
+    exit();
+}
+
+// Session Timeout Logic (30 minutes)
+$timeout_duration = 1800; // 30 minutes in seconds
+if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout_duration)) {
+    session_unset();
+    session_destroy();
+    header("Location: login?error=timeout");
+    exit();
+}
+$_SESSION['last_activity'] = time();
+?>
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Sheet Online - Hana Project</title>
+    <!-- Bootstrap 5 CSS -->
+    <!-- Bootstrap 5 CSS -->
+    <link href="assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="assets/libs/fontawesome/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="assets/css/style.css">
+    <!-- SweetAlert2 -->
+    <script src="assets/libs/sweetalert2/sweetalert2.all.min.js"></script>
+</head>
+
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="p-4 mb-4">
+            <h4 class="fw-bold text-primary"><i class="fas fa-microchip me-2"></i><span>Hana Check</span></h4>
+        </div>
+        <nav class="nav flex-column">
+            <a class="nav-link active" href="index">
+                <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+            </a>
+            <a class="nav-link" href="machines">
+                <i class="fas fa-industry"></i> <span>Machines</span>
+            </a>
+            <a class="nav-link" href="products">
+                <i class="fas fa-box"></i> <span>Products</span>
+            </a>
+            <a class="nav-link" href="families">
+                <i class="fas fa-tags"></i> <span>Family</span>
+            </a>
+            <a class="nav-link" href="tooling">
+                <i class="fas fa-tools"></i> <span>Tooling</span>
+            </a>
+            <a class="nav-link" href="check_master">
+                <i class="fas fa-clipboard-list"></i> <span>Check Items</span>
+            </a>
+            <a class="nav-link" href="parameters">
+                <i class="fas fa-sliders-h"></i> <span>Parameters</span>
+            </a>
+            <a class="nav-link" href="inspections">
+                <i class="fas fa-microscope"></i> <span>Inspections</span>
+            </a>
+            <a class="nav-link" href="check_form">
+                <i class="fas fa-clipboard-check"></i> <span>Fill Check Sheet</span>
+            </a>
+            <a class="nav-link" href="history">
+                <i class="fas fa-history"></i> <span>History</span>
+            </a>
+            <a class="nav-link" href="downtime">
+                <i class="fas fa-exclamation-triangle"></i> <span>Downtime / Repair</span>
+            </a>
+            <?php if ($_SESSION['role'] == 'admin'): ?>
+                <a class="nav-link" href="users">
+                    <i class="fas fa-users-cog"></i> <span>User Management</span>
+                </a>
+            <?php endif; ?>
+        </nav>
+    </div>
+
+    <main class="main-content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <button class="btn btn-white shadow-sm border rounded-pill px-3 me-3" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div>
+                <h2 class="fw-bold mb-0" id="page-title">Dashboard</h2>
+                <p class="text-muted small">ระบบตรวจเช็คเครื่องจักรและเครื่องมือออนไลน์</p>
+            </div>
+            <div class="d-flex align-items-center">
+                <div class="me-3 text-end d-none d-md-block">
+                    <div class="fw-bold"><?php echo $_SESSION['full_name']; ?></div>
+                    <div class="text-muted small"><?php echo ucfirst($_SESSION['role']); ?> |
+                        <?php echo $_SESSION['department']; ?>
+                    </div>
+                </div>
+                <?php
+                $initial = strtoupper(substr($_SESSION['full_name'], 0, 1));
+                $bgColors = ['primary', 'success', 'danger', 'warning', 'info', 'dark'];
+                $bgClass = $bgColors[ord($initial) % count($bgColors)];
+                ?>
+                <div class="rounded-circle shadow-sm d-flex align-items-center justify-content-center bg-<?php echo $bgClass; ?> text-white"
+                    style="width: 45px; height: 45px; font-size: 1.2rem; font-weight: bold;">
+                    <?php echo $initial; ?>
+                </div>
+                <a href="logout"
+                    class="btn btn-white border rounded-pill shadow-sm ms-3 text-danger d-flex align-items-center px-3"
+                    title="Logout">
+                    <i class="fas fa-sign-out-alt me-2"></i>
+                    <span class="small fw-bold">Logout</span>
+                </a>
+            </div>
+        </header>

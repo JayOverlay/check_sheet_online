@@ -1,0 +1,232 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap');
+
+:root {
+    --primary-color: #4f46e5;
+    --primary-hover: #4338ca;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --bg-light: #f8fafc;
+    --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --sidebar-width: 260px;
+}
+
+body {
+    font-family: 'Inter', 'Prompt', sans-serif;
+    background-color: var(--bg-light);
+    color: #1e293b;
+    overflow-x: hidden;
+}
+
+/* Sidebar Styling */
+.sidebar {
+    width: var(--sidebar-width);
+    background: white;
+    height: 100vh;
+    position: fixed;
+    border-right: 1px solid #e2e8f0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    overflow-x: hidden;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: 2rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.collapsed+.main-content {
+    margin-left: 80px;
+}
+
+/* Sidebar Collapsed Elements */
+.sidebar.collapsed .nav-link {
+    text-align: center;
+    padding: 0.75rem 0;
+    margin: 0.25rem 0.75rem;
+}
+
+.sidebar.collapsed .nav-link i {
+    margin-right: 0;
+    font-size: 1.25rem;
+}
+
+.sidebar.collapsed .nav-link span,
+.sidebar.collapsed h4 span,
+.sidebar.collapsed hr {
+    display: none;
+}
+
+.sidebar.collapsed h4 {
+    text-align: center;
+    padding: 1.5rem 0 !important;
+}
+
+.sidebar.collapsed h4 i {
+    margin-right: 0 !important;
+    font-size: 1.5rem;
+}
+
+/* Glassmorphism Cards */
+.card-premium {
+    background: white;
+    border-radius: 16px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-premium:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+/* Navigation */
+.nav-link {
+    color: var(--secondary-color);
+    padding: 0.75rem 1.25rem;
+    border-radius: 10px;
+    margin: 0.25rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    background-color: var(--primary-color);
+    color: white !important;
+}
+
+.nav-link i {
+    width: 24px;
+    margin-right: 10px;
+}
+
+/* Stats Cards */
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.stat-primary {
+    background: #e0e7ff;
+    color: #4338ca;
+}
+
+.stat-success {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.stat-warning {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.stat-danger {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Table Styling */
+.table-custom {
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+}
+
+.table-custom thead th {
+    background: #f1f5f9;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    padding: 1rem;
+    border: none;
+}
+
+.table-custom tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* Responsive Improvements */
+@media (max-width: 992px) {
+    .sidebar {
+        margin-left: calc(var(--sidebar-width) * -1);
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+    }
+
+    .sidebar.active {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 576px) {
+    .main-content {
+        padding: 0.75rem;
+    }
+
+    header h2 {
+        font-size: 1.25rem;
+    }
+
+    .card-body {
+        padding: 1rem !important;
+    }
+
+    .btn-sm {
+        padding: 0.4rem 0.6rem;
+    }
+
+    /* Sticky footer for checkboxes/actions can be added here if needed */
+}
+
+/* Touch friendly for Mobile */
+select.form-select-sm,
+.form-control-sm {
+    min-height: 38px;
+    /* Easier to tap */
+}
+
+.table-responsive {
+    border: none;
+}
+
+/* Custom scrollbar for better look */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
