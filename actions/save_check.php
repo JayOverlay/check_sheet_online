@@ -71,19 +71,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         // 6. Redirect to Success Page
         // Redirect back to machines page since check_history might not exist yet
-        header("Location: ../machines?success=check_completed");
+        header("Location: " . BASE_URL . "machines?success=check_completed");
         exit();
 
     } catch (Exception $e) {
         $pdo->rollBack();
         // Log error and redirect with error message
         $error_msg = urlencode($e->getMessage());
-        header("Location: ../check_form?machine_id=$machine_id&employee_id=$employee_id&error=$error_msg");
+        header("Location: " . BASE_URL . "check_form?machine_id=$machine_id&employee_id=$employee_id&error=$error_msg");
         exit();
     }
 } else {
     // If accessed directly without POST
-    header("Location: ../machines");
+    header("Location: " . BASE_URL . "machines");
     exit();
 }
 ?>

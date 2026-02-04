@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login");
+    header("Location: " . BASE_URL . "login");
     exit();
 }
 
@@ -10,7 +10,7 @@ $timeout_duration = 1800; // 30 minutes in seconds
 if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout_duration)) {
     session_unset();
     session_destroy();
-    header("Location: login?error=timeout");
+    header("Location: " . BASE_URL . "login?error=timeout");
     exit();
 }
 $_SESSION['last_activity'] = time();
@@ -105,7 +105,7 @@ $_SESSION['last_activity'] = time();
                     style="width: 45px; height: 45px; font-size: 1.2rem; font-weight: bold;">
                     <?php echo $initial; ?>
                 </div>
-                <a href="logout"
+                <a href="<?php echo BASE_URL; ?>actions/logout"
                     class="btn btn-white border rounded-pill shadow-sm ms-3 text-danger d-flex align-items-center px-3"
                     title="Logout">
                     <i class="fas fa-sign-out-alt me-2"></i>

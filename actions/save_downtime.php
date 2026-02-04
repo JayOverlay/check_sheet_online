@@ -1,22 +1,22 @@
 <?php
-session_start();
 require_once '../config/database.php';
+session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login");
+    header("Location: " . BASE_URL . "login");
     exit();
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $target_str = $_POST['target_id']; // m_1 or t_5
-    $category = $_POST['category'];
-    $problem = $_POST['problem'];
+    $target_str = $_POST['target_id'] ?? ''; // m_1 or t_5
+    $category = $_POST['category'] ?? '';
+    $problem = $_POST['problem'] ?? '';
     $reported_by = $_SESSION['full_name']; // Store name for simple display
 
     // Parse target
     $parts = explode('_', $target_str);
     if (count($parts) < 2) {
-        header("Location: downtime?error=invalid_target");
+        header("Location: " . BASE_URL . "downtime?error=invalid_target");
         exit();
     }
     $type_prefix = $parts[0];
@@ -38,16 +38,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
-        header("Location: downtime?success=1");
+        header("Location: " . BASE_URL . "downtime?success=1");
         exit();
 
     } catch (Exception $e) {
         $pdo->rollBack();
-        header("Location: downtime?error=save_failed&details=" . urlencode($e->getMessage()));
+        header("Location: " . BASE_URL . "downtime?error=save_failed&details=" . urlencode($e->getMessage()));
         exit();
     }
 } else {
-    header("Location: downtime");
+    header("Location: " . BASE_URL . "downtime");
     exit();
 }
 ?>

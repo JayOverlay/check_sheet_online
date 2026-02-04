@@ -1,9 +1,10 @@
 <?php
+require_once '../config/database.php';
 session_start();
+
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     die("Unauthorized access.");
 }
-require_once '../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id = $_POST['user_id'] ?? '';
@@ -36,16 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$username, $hashed_password, $full_name, $email, $role, $status, $department]);
         }
 
-        header("Location: users?success=1");
+        header("Location: " . BASE_URL . "users?success=1");
         exit();
     } catch (Exception $e) {
         // Redirect back with error message for better UX
         $error_msg = urlencode($e->getMessage());
-        header("Location: users?error=save_failed&details=$error_msg");
+        header("Location: " . BASE_URL . "users?error=save_failed&details=$error_msg");
         exit();
     }
 } else {
-    header("Location: users");
+    header("Location: " . BASE_URL . "users");
     exit();
 }
 ?>

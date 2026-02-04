@@ -1,15 +1,15 @@
 <?php
-session_start();
 require_once '../config/database.php';
+session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login");
+    header("Location: " . BASE_URL . "login");
     exit();
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $action = $_POST['action'];
-    $id = $_POST['downtime_id'];
+    $action = $_POST['action'] ?? '';
+    $id = $_POST['downtime_id'] ?? '';
     $user_id = $_SESSION['user_id'];
     $role = $_SESSION['role'];
 
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($role !== 'Technicien' && $role !== 'admin')
                 throw new Exception("Unauthorized");
 
-            $solution = $_POST['solution'];
+            $solution = $_POST['solution'] ?? '';
             // Status: In Progress -> Technician Finished
             // Assign technician_id at finish time if oversight (redundancy)
             $pdo->prepare("UPDATE downtime SET status = 'Technician Finished', solution = ?, technician_id = COALESCE(technician_id, ?), fixed_at = NOW() WHERE id = ?")
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($role !== 'leader' && $role !== 'admin')
                 throw new Exception("Unauthorized");
 
-            $comment = $_POST['leader_comment'];
+            $comment = $_POST['leader_comment'] ?? '';
 
             // 1. Close current
             $rejectMsg = "Rejected: " . $comment;
@@ -83,11 +83,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
-        header("Location: downtime?success=1");
+        header("Location: " . BASE_URL . "downtime?success=1");
+        exit();
 
     } catch (Exception $e) {
-        $pdo->rollBack();
-        header("Location: downtime?error=1&details=" . urlencode($e->getMessage()));
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        header("Location: " . BASE_URL . "downtime?error=1&details=" . urlencode($e->getMessage()));
+        exit();
     }
 }
 ?>

@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $pdo->commit();
 
-        header("Location: tooling?success=1");
+        header("Location: " . BASE_URL . "tooling?success=1");
         exit();
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die("Error saving tool: " . $e->getMessage());
     }
 } else {
-    header("Location: tooling");
+    header("Location: " . BASE_URL . "tooling");
     exit();
 }
 ?>

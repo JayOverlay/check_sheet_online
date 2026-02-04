@@ -1,23 +1,24 @@
 <?php
+require_once '../config/database.php';
 session_start();
+
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login");
+    header("Location: " . BASE_URL . "login");
     exit();
 }
-require_once '../config/database.php';
 
 if (isset($_GET['id'])) {
     $id = $_GET['id'];
     try {
         $stmt = $pdo->prepare("DELETE FROM tooling WHERE id = ?");
         $stmt->execute([$id]);
-        header("Location: tooling?deleted=1");
+        header("Location: " . BASE_URL . "tooling?deleted=1");
         exit();
     } catch (Exception $e) {
-        header("Location: tooling?error=1");
+        header("Location: " . BASE_URL . "tooling?error=1");
         exit();
     }
 }
-header("Location: tooling");
+header("Location: " . BASE_URL . "tooling");
 exit();
 ?>
