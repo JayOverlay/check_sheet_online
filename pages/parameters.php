@@ -39,7 +39,30 @@ if (isset($_GET['delete'])) {
     }
 }
 
-$params = $pdo->query("SELECT * FROM parameters_master ORDER BY name_en ASC")->fetchAll();
+// Pagination Setup
+$items_per_page = 15;
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+if ($page < 1)
+    $page = 1;
+$offset = ($page - 1) * $items_per_page;
+
+$params = [];
+$total_items = 0;
+
+try {
+    // Get total count
+    $total_items = $pdo->query("SELECT COUNT(*) FROM parameters_master")->fetchColumn();
+    $total_pages = ceil($total_items / $items_per_page);
+
+    // Fetch parameters with limit
+    $stmt = $pdo->prepare("SELECT * FROM parameters_master ORDER BY name_en ASC LIMIT ? OFFSET ?");
+    $stmt->bindValue(1, (int) $items_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(2, (int) $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    $params = $stmt->fetchAll();
+} catch (Exception $e) {
+    $error = "Error: " . $e->getMessage();
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -83,8 +106,12 @@ $params = $pdo->query("SELECT * FROM parameters_master ORDER BY name_en ASC")->f
                                         <?php echo $p['unit'] ?: '-'; ?>
                                     </span></td>
                                 <td class="text-center fw-bold text-primary"><?php echo $p['default_target'] ?: '-'; ?></td>
-                                <td class="text-center text-success fw-semibold"><?php echo ($p['default_plus'] != 0) ? '+' . $p['default_plus'] : '0'; ?></td>
-                                <td class="text-center text-danger fw-semibold"><?php echo ($p['default_minus'] != 0) ? '-' . $p['default_minus'] : '0'; ?></td>
+                                <td class="text-center text-success fw-semibold">
+                                    <?php echo ($p['default_plus'] != 0) ? '+' . $p['default_plus'] : '0'; ?>
+                                </td>
+                                <td class="text-center text-danger fw-semibold">
+                                    <?php echo ($p['default_minus'] != 0) ? '-' . $p['default_minus'] : '0'; ?>
+                                </td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-light rounded-circle me-1"
                                         onclick='openEditModal(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, "UTF-8"); ?>)'>
@@ -101,6 +128,34 @@ $params = $pdo->query("SELECT * FROM parameters_master ORDER BY name_en ASC")->f
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        <?php if ($total_pages > 1): ?>
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <div class="small text-muted">
+                    Showing <span class="fw-bold"><?php echo $offset + 1; ?></span> to
+                    <span class="fw-bold"><?php echo min($offset + $items_per_page, $total_items); ?></span>
+                    of <span class="fw-bold"><?php echo $total_items; ?></span> parameters
+                </div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
+                            <a class="page-link shadow-none" href="?page=<?php echo $page - 1; ?>"><i
+                                    class="fas fa-chevron-left"></i></a>
+                        </li>
+                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                            <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
+                                <a class="page-link shadow-none" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        <li class="page-item <?php echo ($page >= $total_pages) ? 'disabled' : ''; ?>">
+                            <a class="page-link shadow-none" href="?page=<?php echo $page + 1; ?>"><i
+                                    class="fas fa-chevron-right"></i></a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

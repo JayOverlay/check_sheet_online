@@ -21,7 +21,30 @@ if (isset($_GET['delete'])) {
     $stmt->execute([$id]);
 }
 
-$families = $pdo->query("SELECT * FROM family_types ORDER BY name ASC")->fetchAll();
+// Pagination Setup
+$items_per_page = 15;
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+if ($page < 1)
+    $page = 1;
+$offset = ($page - 1) * $items_per_page;
+
+$families = [];
+$total_items = 0;
+
+try {
+    // Get total count
+    $total_items = $pdo->query("SELECT COUNT(*) FROM family_types")->fetchColumn();
+    $total_pages = ceil($total_items / $items_per_page);
+
+    // Fetch families with limit
+    $stmt = $pdo->prepare("SELECT * FROM family_types ORDER BY name ASC LIMIT ? OFFSET ?");
+    $stmt->bindValue(1, (int) $items_per_page, PDO::PARAM_INT);
+    $stmt->bindValue(2, (int) $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    $families = $stmt->fetchAll();
+} catch (Exception $e) {
+    // Handle error
+}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -68,6 +91,34 @@ $families = $pdo->query("SELECT * FROM family_types ORDER BY name ASC")->fetchAl
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        <?php if ($total_pages > 1): ?>
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <div class="small text-muted">
+                    Showing <span class="fw-bold"><?php echo $offset + 1; ?></span> to
+                    <span class="fw-bold"><?php echo min($offset + $items_per_page, $total_items); ?></span>
+                    of <span class="fw-bold"><?php echo $total_items; ?></span> families
+                </div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
+                            <a class="page-link shadow-none" href="?page=<?php echo $page - 1; ?>"><i
+                                    class="fas fa-chevron-left"></i></a>
+                        </li>
+                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                            <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
+                                <a class="page-link shadow-none" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        <li class="page-item <?php echo ($page >= $total_pages) ? 'disabled' : ''; ?>">
+                            <a class="page-link shadow-none" href="?page=<?php echo $page + 1; ?>"><i
+                                    class="fas fa-chevron-right"></i></a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

@@ -1,22 +1,19 @@
 RewriteEngine On
 RewriteBase /check_sheet_online/
 
-# 1. Hide .php extension (External Redirect)
-RewriteCond %{REQUEST_METHOD} GET
-RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /check_sheet_online/([^\ ]+)\.php
-RewriteRule ^([^\.]+)\.php$ $1 [L,R=301]
+# 1. Bypass existing files/directories
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-# 2. Check for pages in 'pages/' directory
-RewriteCond %{REQUEST_FILENAME} !-d
+# 2. Map [folder]/[file] to [folder]/[file].php if it exists
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.+)$ $1.php [L]
+
+# 3. Map [file] to pages/[file].php (For history, machines, etc.)
 RewriteCond %{DOCUMENT_ROOT}/check_sheet_online/pages/$1.php -f
 RewriteRule ^([^/]+)$ pages/$1.php [L]
 
-# 3. Check for actions in 'actions/' directory
-RewriteCond %{REQUEST_FILENAME} !-d
+# 4. Map actions/[file] to actions/[file].php specifically
 RewriteCond %{DOCUMENT_ROOT}/check_sheet_online/actions/$1.php -f
-RewriteRule ^([^/]+)$ actions/$1.php [L]
-
-# 4. Check for pages in Root (like login, index)
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule ^([^/]+)$ $1.php [L]
+RewriteRule ^actions/([^/]+)$ actions/$1.php [L]

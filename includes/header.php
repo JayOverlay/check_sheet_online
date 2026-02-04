@@ -23,14 +23,13 @@ $_SESSION['last_activity'] = time();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Check Sheet Online - Hana Project</title>
     <!-- Bootstrap 5 CSS -->
-    <!-- Bootstrap 5 CSS -->
-    <link href="assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="assets/libs/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/libs/fontawesome/css/all.min.css">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css">
     <!-- SweetAlert2 -->
-    <script src="assets/libs/sweetalert2/sweetalert2.all.min.js"></script>
+    <script src="<?php echo BASE_URL; ?>assets/libs/sweetalert2/sweetalert2.all.min.js"></script>
 </head>
 
 <body>

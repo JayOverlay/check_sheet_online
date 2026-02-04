@@ -6,9 +6,8 @@
 </main>
 
 <!-- Scripts -->
-<!-- Scripts -->
-<script src="assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
-<script src="assets/libs/jquery/jquery.min.js"></script>
+<script src="<?php echo BASE_URL; ?>assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="<?php echo BASE_URL; ?>assets/libs/jquery/jquery.min.js"></script>
 <script>
     // Sidebar Toggle Logic (Desktop & Mobile)
     $('#sidebarToggle').on('click', function () {
@@ -19,70 +18,91 @@
         }
     });
 
-    // Active Link Highlight
-    const currentLocation = location.href;
+    // Active Link Highlight - Use pathname to ignore query params
+    const currentPath = location.pathname;
     const menuItem = document.querySelectorAll('.nav-link');
-    const menuLength = menuItem.length;
-    for (let i = 0; i < menuLength; i++) {
-        if (menuItem[i].href === currentLocation) {
-            menuItem.forEach(item => item.classList.remove('active'));
-            menuItem[i].classList.add('active');
+    menuItem.forEach(item => {
+        // Extract pathname from link href
+        const linkPath = new URL(item.href, location.origin).pathname;
+
+        // Check if current path ends with or matches the link path
+        if (currentPath === linkPath || currentPath.endsWith('/' + linkPath.split('/').pop())) {
+            menuItem.forEach(m => m.classList.remove('active'));
+            item.classList.add('active');
 
             // Update Page Title
-            const title = menuItem[i].innerText.trim();
-            document.getElementById('page-title').innerText = title;
-        }
-    }
-
-    // Global SweetAlert Notifications
-    const urlParams = new URLSearchParams(window.location.search);
-
-    const Toast = Swal.mixin({
-        toast: true,
-        position: 'top-end',
-        showConfirmButton: false,
-        timer: 3000,
-        timerProgressBar: true,
-        didOpen: (toast) => {
-            toast.addEventListener('mouseenter', Swal.stopTimer)
-            toast.addEventListener('mouseleave', Swal.resumeTimer)
+            const title = item.innerText.trim();
+            const titleEl = document.getElementById('page-title');
+            if (titleEl) titleEl.innerText = title;
         }
     });
 
-    if (urlParams.has('success')) {
-        Toast.fire({
-            icon: 'success',
-            title: 'Action completed successfully!'
-        });
-    }
+    // Global SweetAlert Notifications
+    $(document).ready(function () {
+        const urlParams = new URLSearchParams(window.location.search);
 
-    if (urlParams.has('error')) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Oops...',
-            text: 'Something went wrong! Please try again.',
-            confirmButtonColor: '#4f46e5'
-        });
-    }
+        // Check if Swal is defined
+        if (typeof Swal === 'undefined') {
+            console.error('SweetAlert2 is not loaded!');
+            return;
+        }
 
-    if (urlParams.has('deleted')) {
-        Toast.fire({
-            icon: 'warning',
-            title: 'Record deleted successfully.'
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
         });
-    }
+
+        if (urlParams.has('success')) {
+            console.log('Showing success toast');
+            Toast.fire({
+                icon: 'success',
+                title: 'บันทึกสำเร็จ!'
+            });
+            // Clean URL after showing toast
+            setTimeout(() => {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 100);
+        }
+
+        if (urlParams.has('error')) {
+            Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: 'กรุณาลองใหม่อีกครั้ง',
+                confirmButtonColor: '#4f46e5'
+            });
+        }
+
+        if (urlParams.has('deleted')) {
+            Toast.fire({
+                icon: 'warning',
+                title: 'ลบข้อมูลสำเร็จ!'
+            });
+            // Clean URL after showing toast
+            setTimeout(() => {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 100);
+        }
+    });
 
     // Common function for delete confirmation
     function confirmDelete(url) {
         Swal.fire({
-            title: 'Are you sure?',
-            text: "You won't be able to revert this!",
+            title: 'ยืนยันการลบ?',
+            text: "คุณจะไม่สามารถกู้คืนข้อมูลนี้ได้!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#ef4444',
             cancelButtonColor: '#64748b',
-            confirmButtonText: 'Yes, delete it!',
-            cancelButtonText: 'Cancel'
+            confirmButtonText: 'ใช่, ลบเลย!',
+            cancelButtonText: 'ยกเลิก'
         }).then((result) => {
             if (result.isConfirmed) {
                 window.location.href = url;

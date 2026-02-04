@@ -29,7 +29,7 @@ try {
     $productTypes = $pdo->query("SELECT name FROM product_types ORDER BY name ASC")->fetchAll();
     $familyTypes = $pdo->query("SELECT name FROM family_types ORDER BY name ASC")->fetchAll();
     $masterChecks = $pdo->query("SELECT * FROM check_items 
-        WHERE category IN ('Tooling', 'Common', 'Customer', 'Parameter', 'Inspection')
+        WHERE category IN ('Tooling', 'Common', 'Customer', 'Parameter', 'Inspection', 'Safety')
         ORDER BY 
         category ASC,
         CAST(SUBSTRING_INDEX(item_code, '.', 1) AS UNSIGNED) ASC, 

@@ -26,15 +26,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
+    $id = $_POST['machine_id'] ?? ''; // Check if ID exists for Edit
+
     try {
         $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("INSERT INTO machines (machine_code, serial_number, machine_name, image_path, product, family, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$machine_code, $serial_number, $machine_name, $image_path, $product, $family, $status]);
+        if (empty($id)) {
+            // INSERT
+            $stmt = $pdo->prepare("INSERT INTO machines (machine_code, serial_number, machine_name, image_path, product, family, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$machine_code, $serial_number, $machine_name, $image_path, $product, $family, $status]);
+            $machine_id = $pdo->lastInsertId();
+        } else {
+            // UPDATE
+            $machine_id = $id;
+            $sql = "UPDATE machines SET machine_code=?, serial_number=?, machine_name=?, product=?, family=?, status=?";
+            $params = [$machine_code, $serial_number, $machine_name, $product, $family, $status];
 
-        $machine_id = $pdo->lastInsertId();
+            if (!empty($image_path)) {
+                $sql .= ", image_path=?";
+                $params[] = $image_path;
+            }
 
-        // Save assigned check items
+            $sql .= " WHERE id=?";
+            $params[] = $machine_id;
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+
+            // Clear existing relations to re-insert
+            $pdo->prepare("DELETE FROM machine_check_items WHERE machine_id = ?")->execute([$machine_id]);
+            $pdo->prepare("DELETE FROM machine_parameters WHERE machine_id = ?")->execute([$machine_id]);
+            $pdo->prepare("DELETE FROM machine_inspections WHERE machine_id = ?")->execute([$machine_id]);
+        }
+
+        // Save assigned check items (Common for both Insert and Update)
         if (isset($_POST['check_items']) && is_array($_POST['check_items'])) {
             $checkStmt = $pdo->prepare("INSERT INTO machine_check_items (machine_id, check_item_id, frequency) VALUES (?, ?, ?)");
             foreach ($_POST['check_items'] as $itemId) {
@@ -71,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $pdo->commit();
 
-        header("Location: machines?success=1");
+        header("Location: ../machines?success=1");
         exit();
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {

@@ -30,7 +30,7 @@ try {
     $productTypes = $pdo->query("SELECT name FROM product_types ORDER BY name ASC")->fetchAll();
     $familyTypes = $pdo->query("SELECT name FROM family_types ORDER BY name ASC")->fetchAll();
     $masterChecks = $pdo->query("SELECT * FROM check_items 
-        WHERE category IN ('Machine', 'Common', 'Customer', 'Parameter', 'Inspection')
+        WHERE category IN ('Machine', 'Common', 'Customer', 'Parameter', 'Inspection', 'Safety')
         ORDER BY 
         category ASC,
         CAST(SUBSTRING_INDEX(item_code, '.', 1) AS UNSIGNED) ASC, 
@@ -44,8 +44,7 @@ try {
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold mb-0">Machine Inventory</h4>
-    <button class="btn btn-primary rounded-pill px-4 shadow-sm" data-bs-toggle="modal"
-        data-bs-target="#addMachineModal">
+    <button class="btn btn-primary rounded-pill px-4 shadow-sm" onclick="openAddModal()">
         <i class="fas fa-plus me-2"></i> Add Machine
     </button>
 </div>
@@ -113,8 +112,14 @@ try {
                                     </span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-light rounded-circle me-1"><i
-                                            class="fas fa-edit text-primary"></i></button>
+                                    <button class="btn btn-sm btn-light rounded-circle me-1"
+                                        onclick="viewMachine(<?php echo $m['id']; ?>)" title="View Details">
+                                        <i class="fas fa-eye text-success"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-light rounded-circle me-1"
+                                        onclick="editMachine(<?php echo $m['id']; ?>)">
+                                        <i class="fas fa-edit text-primary"></i>
+                                    </button>
                                     <button class="btn btn-sm btn-light rounded-circle"
                                         onclick="confirmDelete('delete_machine?id=<?php echo $m['id']; ?>')">
                                         <i class="fas fa-trash text-danger"></i>
@@ -161,32 +166,36 @@ try {
 <div class="modal fade" id="addMachineModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="save_machine" method="POST" enctype="multipart/form-data">
+            <form action="<?php echo BASE_URL; ?>actions/save_machine.php" method="POST" enctype="multipart/form-data"
+                id="machineForm">
+                <input type="hidden" name="machine_id" id="machine_id">
                 <div class="modal-header border-0 p-4 pb-0">
-                    <h5 class="fw-bold mb-0">Register New Machine</h5>
+                    <h5 class="fw-bold mb-0" id="modalTitle">Register New Machine</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-uppercase">Machine Code</label>
-                            <input type="text" class="form-control" name="machine_code" placeholder="e.g. MCH-001"
-                                required>
+                            <input type="text" class="form-control" name="machine_code" id="machine_code"
+                                placeholder="e.g. MCH-001" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-uppercase">Machine Name</label>
-                            <input type="text" class="form-control" name="machine_name" placeholder="Name" required>
+                            <input type="text" class="form-control" name="machine_name" id="machine_name"
+                                placeholder="Name" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-uppercase">Serial Number</label>
-                            <input type="text" class="form-control" name="serial_number" placeholder="S/N" required>
+                            <input type="text" class="form-control" name="serial_number" id="serial_number"
+                                placeholder="S/N" required>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-uppercase">Product</label>
-                            <select class="form-select" name="product">
+                            <select class="form-select" name="product" id="product">
                                 <option value="">-- Select Product --</option>
                                 <?php foreach ($productTypes as $pt): ?>
                                     <option value="<?php echo $pt['name']; ?>">
@@ -197,7 +206,7 @@ try {
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-uppercase">Family</label>
-                            <select class="form-select" name="family">
+                            <select class="form-select" name="family" id="family">
                                 <option value="">-- Select Family --</option>
                                 <?php foreach ($familyTypes as $ft): ?>
                                     <option value="<?php echo $ft['name']; ?>">
@@ -211,7 +220,7 @@ try {
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-bold text-uppercase">Initial Status</label>
-                            <select class="form-select" name="status">
+                            <select class="form-select" name="status" id="status">
                                 <option value="Active">Active</option>
                                 <option value="Maintenance">Maintenance</option>
                                 <option value="Inactive">Inactive</option>
@@ -387,8 +396,206 @@ try {
     </div>
 </div>
 
+<!-- View Machine Modal -->
+<div class="modal fade" id="viewMachineModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 bg-light p-4 pb-3">
+                <h5 class="fw-bold mb-0 text-primary"><i class="fas fa-info-circle me-2"></i>Machine Specifications</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pt-2">
+                <div class="row mb-4 align-items-center bg-white p-3 rounded-4 border mx-0">
+                    <div class="col-md-6">
+                        <div class="fw-bold text-dark fs-5" id="v_machine_name">Name</div>
+                        <div class="badge bg-primary-subtle text-primary border border-primary-subtle"
+                            id="v_machine_code">Code</div>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <div class="small text-muted fw-bold text-uppercase">Product / Family</div>
+                        <div class="fw-bold text-secondary" id="v_pf">PF Name</div>
+                    </div>
+                </div>
+
+                <ul class="nav nav-pills nav-fill bg-light p-1 rounded-pill mb-3" role="tablist">
+                    <li class="nav-item"><button class="nav-link active rounded-pill px-4" data-bs-toggle="tab"
+                            data-bs-target="#v-checks">Checks</button></li>
+                    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab"
+                            data-bs-target="#v-params">Params</button></li>
+                    <li class="nav-item"><button class="nav-link rounded-pill px-4" data-bs-toggle="tab"
+                            data-bs-target="#v-insps">Insps</button></li>
+                </ul>
+
+                <div class="tab-content" style="max-height: 400px; overflow-y: auto;">
+                    <div class="tab-pane fade show active" id="v-checks">
+                        <table class="table table-sm align-middle">
+                            <thead class="small text-muted text-uppercase">
+                                <tr>
+                                    <th class="ps-3">Code</th>
+                                    <th>Item Name</th>
+                                    <th>Freq</th>
+                                </tr>
+                            </thead>
+                            <tbody id="v_checks_body"></tbody>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="v-params">
+                        <table class="table table-sm align-middle">
+                            <thead class="small text-muted text-uppercase">
+                                <tr>
+                                    <th class="ps-3">Parameter</th>
+                                    <th class="text-center">Target</th>
+                                    <th class="text-center">Tolerance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="v_params_body"></tbody>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="v-insps">
+                        <table class="table table-sm align-middle">
+                            <thead class="small text-muted text-uppercase">
+                                <tr>
+                                    <th class="ps-3">Inspection</th>
+                                    <th class="text-center">Target</th>
+                                    <th class="text-center">Tolerance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="v_insps_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-3">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const masterItems = <?php echo json_encode($masterChecks); ?>;
+    let addModal;
+    let viewSpecModal;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        addModal = new bootstrap.Modal(document.getElementById('addMachineModal'));
+        viewSpecModal = new bootstrap.Modal(document.getElementById('viewMachineModal'));
+    });
+
+    function viewMachine(id) {
+        document.getElementById('v_checks_body').innerHTML = '<tr><td colspan="3" class="text-center py-4">Loading...</td></tr>';
+        viewSpecModal.show();
+
+        fetch('<?php echo BASE_URL; ?>actions/get_machine_details.php?id=' + id)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { alert(data.error); return; }
+                const m = data.machine;
+                document.getElementById('v_machine_name').textContent = m.machine_name;
+                document.getElementById('v_machine_code').textContent = m.machine_code;
+                document.getElementById('v_pf').textContent = `${m.product} / ${m.family}`;
+
+                // Pop Checks
+                const cb = document.getElementById('v_checks_body');
+                cb.innerHTML = '';
+                (data.checkItems || []).forEach(i => {
+                    cb.innerHTML += `<tr><td class="ps-3 small fw-bold text-primary">${i.item_code}</td><td><div class="small fw-bold">${i.name_en}</div><div class="text-muted" style="font-size:0.7rem">${i.name_th}</div></td><td><span class="badge bg-light text-dark border">${i.frequency}</span></td></tr>`;
+                });
+                if (!data.checkItems.length) cb.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small">No items mapped.</td></tr>';
+
+                // Pop Params
+                const pb = document.getElementById('v_params_body');
+                pb.innerHTML = '';
+                (data.parameters || []).forEach(p => {
+                    pb.innerHTML += `<tr><td class="ps-3"><strong>${p.name_en}</strong> <small class="text-muted">(${p.unit})</small></td><td class="text-center">${p.target_value}</td><td class="text-center">+${p.plus_tolerance}/-${p.minus_tolerance}</td></tr>`;
+                });
+                if (!data.parameters.length) pb.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small">No parameters.</td></tr>';
+
+                // Pop Insps
+                const ib = document.getElementById('v_insps_body');
+                ib.innerHTML = '';
+                (data.inspections || []).forEach(i => {
+                    ib.innerHTML += `<tr><td class="ps-3"><strong>${i.name_en}</strong> <small class="text-muted">(${i.unit})</small></td><td class="text-center">${i.target_value}</td><td class="text-center">+${i.plus_tolerance}/-${i.minus_tolerance}</td></tr>`;
+                });
+                if (!data.inspections.length) ib.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small">No inspections.</td></tr>';
+            });
+    }
+
+    function openAddModal() {
+        document.getElementById('machineForm').reset();
+        document.getElementById('machine_id').value = '';
+        document.getElementById('modalTitle').textContent = 'Register New Machine';
+
+        // Clear tables
+        document.getElementById('selectedChecksBody').innerHTML = `<tr id="noItemsNote"><td colspan="4" class="text-center py-3 text-muted small">No items selected. Add from dropdown above.</td></tr>`;
+        document.getElementById('selectedParamsBody').innerHTML = `<tr id="noParamsNote"><td colspan="5" class="text-center py-2 text-muted small">Optional: No parameters selected.</td></tr>`;
+        document.getElementById('selectedInspectionsBody').innerHTML = `<tr id="noInsNote"><td colspan="5" class="text-center py-2 text-muted small">Optional: No inspections selected.</td></tr>`;
+
+        addModal.show();
+    }
+
+    function editMachine(id) {
+        document.getElementById('machineForm').reset();
+        document.getElementById('machine_id').value = id;
+        document.getElementById('modalTitle').textContent = 'Edit Machine';
+
+        // Clear tables first
+        document.getElementById('selectedChecksBody').innerHTML = '';
+        document.getElementById('selectedParamsBody').innerHTML = '';
+        document.getElementById('selectedInspectionsBody').innerHTML = '';
+
+        // Fetch Data
+        fetch('<?php echo BASE_URL; ?>get_machine_details?id=' + id)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Set Basic Info
+                const m = data.machine;
+                document.getElementById('machine_code').value = m.machine_code;
+                document.getElementById('machine_name').value = m.machine_name;
+                document.getElementById('serial_number').value = m.serial_number;
+                document.getElementById('product').value = m.product;
+                document.getElementById('family').value = m.family;
+                document.getElementById('status').value = m.status;
+
+                // Set Check Items
+                if (data.checkItems && data.checkItems.length > 0) {
+                    data.checkItems.forEach(item => {
+                        addCheckItemRow(item.check_item_id, item.item_code, item.name_en, item.name_th, item.frequency);
+                    });
+                } else {
+                    document.getElementById('selectedChecksBody').innerHTML = `<tr id="noItemsNote"><td colspan="4" class="text-center py-3 text-muted small">No items selected. Add from dropdown above.</td></tr>`;
+                }
+
+                // Set Parameters
+                if (data.parameters && data.parameters.length > 0) {
+                    data.parameters.forEach(p => {
+                        addParameterRow(p.parameter_id, p.name_en, p.unit, p.target_value, p.plus_tolerance, p.minus_tolerance);
+                    });
+                } else {
+                    document.getElementById('selectedParamsBody').innerHTML = `<tr id="noParamsNote"><td colspan="5" class="text-center py-2 text-muted small">Optional: No parameters selected.</td></tr>`;
+                }
+
+                // Set Inspections
+                if (data.inspections && data.inspections.length > 0) {
+                    data.inspections.forEach(i => {
+                        addInspectionRow(i.inspection_id, i.name_en, i.unit, i.target_value, i.plus_tolerance, i.minus_tolerance);
+                    });
+                } else {
+                    document.getElementById('selectedInspectionsBody').innerHTML = `<tr id="noInsNote"><td colspan="5" class="text-center py-2 text-muted small">Optional: No inspections selected.</td></tr>`;
+                }
+
+                addModal.show();
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Failed to fetch machine details');
+            });
+    }
 
     function addCheckItemFromSelect() {
         const select = document.getElementById('checkItemSearch');
@@ -401,7 +608,7 @@ try {
         select.value = ""; // Reset dropdown
     }
 
-    function addCheckItemRow(id, code, en, th) {
+    function addCheckItemRow(id, code, en, th, frequency = 'daily') {
         // Check if already exists
         if (document.getElementById('row_check_' + id)) return;
 
@@ -421,13 +628,13 @@ try {
             </td>
             <td>
                 <select class="form-select form-select-sm" name="frequency[${id}]">
-                    <option value="shift">Shift</option>
-                    <option value="daily" selected>Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="6_months">6 Months</option>
-                    <option value="yearly">Yearly</option>
+                    <option value="shift" ${frequency === 'shift' ? 'selected' : ''}>Shift</option>
+                    <option value="daily" ${frequency === 'daily' ? 'selected' : ''}>Daily</option>
+                    <option value="weekly" ${frequency === 'weekly' ? 'selected' : ''}>Weekly</option>
+                    <option value="monthly" ${frequency === 'monthly' ? 'selected' : ''}>Monthly</option>
+                    <option value="quarterly" ${frequency === 'quarterly' ? 'selected' : ''}>Quarterly</option>
+                    <option value="6_months" ${frequency === '6_months' ? 'selected' : ''}>6 Months</option>
+                    <option value="yearly" ${frequency === 'yearly' ? 'selected' : ''}>Yearly</option>
                 </select>
             </td>
             <td>
