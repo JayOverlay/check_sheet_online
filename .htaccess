@@ -1,19 +1,15 @@
 RewriteEngine On
 RewriteBase /check_sheet_online/
 
-# 1. Bypass existing files/directories
+# Bypass existing files/dirs
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# 2. Map [folder]/[file] to [folder]/[file].php if it exists
+# Redirect to root files specifically with .php extension
 RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule ^(.+)$ $1.php [L]
+RewriteRule ^([^/]+)$ $1.php [L]
 
-# 3. Map [file] to pages/[file].php (For history, machines, etc.)
-RewriteCond %{DOCUMENT_ROOT}/check_sheet_online/pages/$1.php -f
+# Redirect to pages/ folder specifically with .php extension
+RewriteCond pages/$1.php -f
 RewriteRule ^([^/]+)$ pages/$1.php [L]
-
-# 4. Map actions/[file] to actions/[file].php specifically
-RewriteCond %{DOCUMENT_ROOT}/check_sheet_online/actions/$1.php -f
-RewriteRule ^actions/([^/]+)$ actions/$1.php [L]

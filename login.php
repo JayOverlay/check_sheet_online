@@ -4,7 +4,7 @@ require_once 'config/database.php';
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
-    header("Location: " . BASE_URL . "index");
+    header("Location: " . BASE_URL . "index.php");
     exit();
 }
 
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['department'] = $user['department'];
             $_SESSION['last_activity'] = time();
 
-            header("Location: " . BASE_URL . "index");
+            header("Location: " . BASE_URL . "index.php");
             exit();
         } else {
             $error = "Invalid username or password, or account is inactive.";

@@ -72,12 +72,19 @@
         }
 
         if (urlParams.has('error')) {
+            const errorMsg = urlParams.get('error');
             Swal.fire({
                 icon: 'error',
                 title: 'เกิดข้อผิดพลาด',
-                text: 'กรุณาลองใหม่อีกครั้ง',
+                text: errorMsg && errorMsg !== '1' ? decodeURIComponent(errorMsg) : 'กรุณาลองใหม่อีกครั้ง',
                 confirmButtonColor: '#4f46e5'
             });
+            // Clean URL after showing swal
+            setTimeout(() => {
+                const url = new URL(window.location);
+                url.searchParams.delete('error');
+                window.history.replaceState({}, document.title, url.pathname + url.search);
+            }, 100);
         }
 
         if (urlParams.has('deleted')) {

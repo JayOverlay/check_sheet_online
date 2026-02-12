@@ -134,7 +134,7 @@ try {
                                         <i class="fas fa-edit text-primary"></i>
                                     </button>
                                     <button class="btn btn-sm btn-light rounded-circle text-danger"
-                                        onclick="confirmDelete('delete_user?id=<?php echo $u['id']; ?>')">
+                                        onclick="confirmDelete('../actions/delete_user.php?id=<?php echo $u['id']; ?>')">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -173,7 +173,7 @@ try {
 <div class="modal fade" id="addUserModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="save_user" method="POST">
+            <form action="../actions/save_user.php" method="POST">
                 <input type="hidden" name="user_id" id="user_id">
                 <div class="modal-header border-0 p-4 pb-0">
                     <h5 class="fw-bold mb-0" id="modalTitle">Register New User</h5>

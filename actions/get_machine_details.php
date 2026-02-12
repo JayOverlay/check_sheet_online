@@ -1,6 +1,7 @@
 <?php
+ob_start();
 require_once '../config/database.php';
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 if (!isset($_GET['id'])) {
     echo json_encode(['error' => 'No ID provided']);
@@ -49,6 +50,7 @@ try {
     $stmt->execute([$id]);
     $inspections = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    ob_clean(); // Ensure buffer is empty before JSON
     echo json_encode([
         'machine' => $machine,
         'checkItems' => $checkItems,
@@ -56,7 +58,14 @@ try {
         'inspections' => $inspections
     ]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    // Clear any previous output
+    if (ob_get_length())
+        ob_clean();
+
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode([
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString()
+    ]);
 }

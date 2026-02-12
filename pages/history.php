@@ -8,6 +8,17 @@ $end_date = $_GET['end_date'] ?? '';
 $search_code = $_GET['search_code'] ?? '';
 $status_filter = $_GET['status'] ?? '';
 $inspector_filter = $_GET['inspector'] ?? '';
+$product_filter = $_GET['product'] ?? '';
+$family_filter = $_GET['family'] ?? '';
+
+// Fetch products and families for dropdowns
+try {
+    $productTypes = $pdo->query("SELECT name FROM product_types ORDER BY name ASC")->fetchAll();
+    $familyTypes = $pdo->query("SELECT name FROM family_types ORDER BY name ASC")->fetchAll();
+} catch (Exception $e) {
+    $productTypes = [];
+    $familyTypes = [];
+}
 
 // Pagination Setup
 $items_per_page = 15;
@@ -50,40 +61,74 @@ try {
     }
 
     if ($tab == 'summary') {
-        // Machine Summary Logic
         $countSql = "SELECT COUNT(*) FROM machines WHERE status = 'Active'";
+        $where_params = [];
         if (!empty($search_code)) {
-            $countSql .= " AND (machine_code LIKE :search OR machine_name LIKE :search)";
+            $countSql .= " AND (machine_code LIKE ? OR machine_name LIKE ?)";
+            $where_params[] = "%$search_code%";
+            $where_params[] = "%$search_code%";
         }
+        if (!empty($product_filter)) {
+            $countSql .= " AND product = ?";
+            $where_params[] = $product_filter;
+        }
+        if (!empty($family_filter)) {
+            $countSql .= " AND family = ?";
+            $where_params[] = $family_filter;
+        }
+        
         $countStmt = $pdo->prepare($countSql);
-        if (!empty($search_code))
-            $countStmt->bindValue(':search', "%$search_code%");
-        $countStmt->execute();
+        $countStmt->execute($where_params);
         $total_items = $countStmt->fetchColumn();
         $total_pages = ceil($total_items / $items_per_page);
+
+        // Date filter conditions for the join
+        $date_cond = "";
+        $date_params = [];
+        if (!empty($start_date)) {
+            $date_cond .= " AND DATE(cs.created_at) >= ?";
+            $date_params[] = $start_date;
+        }
+        if (!empty($end_date)) {
+            $date_cond .= " AND DATE(cs.created_at) <= ?";
+            $date_params[] = $end_date;
+        }
 
         $sql = "SELECT m.id, m.machine_code, m.machine_name, m.product, m.family,
                 COUNT(cs.id) as total_checks,
                 SUM(CASE WHEN cs.overall_status = 'Pass' THEN 1 ELSE 0 END) as pass_count,
                 MAX(cs.created_at) as last_check_date,
-                (SELECT overall_status FROM check_sheets WHERE target_id = CONCAT('m_', m.id) ORDER BY created_at DESC LIMIT 1) as last_status
+                (SELECT overall_status FROM check_sheets WHERE target_id = CONCAT('m_', m.id) $date_cond ORDER BY created_at DESC LIMIT 1) as last_status
                 FROM machines m
-                LEFT JOIN check_sheets cs ON CONCAT('m_', m.id) = cs.target_id
+                LEFT JOIN check_sheets cs ON CONCAT('m_', m.id) = cs.target_id $date_cond
                 WHERE m.status = 'Active'";
 
         if (!empty($search_code)) {
-            $sql .= " AND (m.machine_code LIKE :search OR m.machine_name LIKE :search)";
+            $sql .= " AND (m.machine_code LIKE ? OR m.machine_name LIKE ?)";
+        }
+        if (!empty($product_filter)) {
+            $sql .= " AND m.product = ?";
+        }
+        if (!empty($family_filter)) {
+            $sql .= " AND m.family = ?";
         }
 
-        $sql .= " GROUP BY m.id ORDER BY total_checks DESC LIMIT :limit OFFSET :offset";
+        $sql .= " GROUP BY m.id ORDER BY total_checks DESC LIMIT ? OFFSET ?";
+        
         $stmt = $pdo->prepare($sql);
-        if (!empty($search_code))
-            $stmt->bindValue(':search', "%$search_code%");
-        $stmt->bindValue(':limit', (int) $items_per_page, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', (int) $offset, PDO::PARAM_INT);
+        $idx = 1;
+        // Bind for the subquery in SELECT
+        foreach ($date_params as $dp) $stmt->bindValue($idx++, $dp);
+        // Bind for the main JOIN
+        foreach ($date_params as $dp) $stmt->bindValue($idx++, $dp);
+        // Bind for the WHERE filters
+        foreach ($where_params as $p) $stmt->bindValue($idx++, $p);
+        
+        $stmt->bindValue($idx++, (int) $items_per_page, PDO::PARAM_INT);
+        $stmt->bindValue($idx++, (int) $offset, PDO::PARAM_INT);
         $stmt->execute();
         $summaryData = $stmt->fetchAll();
-        $history = $summaryData; // For compat
+        $history = $summaryData; 
     } else {
         // Advanced filters for other tabs
         if (!empty($start_date)) {
@@ -110,6 +155,15 @@ try {
             }
             $params[] = "%$search_code%";
             $params[] = "%$search_code%";
+        }
+        $alias = ($tab == 'tooling') ? 't' : 'm';
+        if (!empty($product_filter)) {
+            $where_clauses[] = "$alias.product = ?";
+            $params[] = $product_filter;
+        }
+        if (!empty($family_filter)) {
+            $where_clauses[] = "$alias.family = ?";
+            $params[] = $family_filter;
         }
 
         $where_sql = count($where_clauses) > 0 ? "WHERE " . implode(" AND ", $where_clauses) : "";
@@ -185,53 +239,126 @@ function getPaginatedUrl($pageNo)
         <div class="card-body p-4">
             <form method="GET" class="row g-3">
                 <input type="hidden" name="tab" value="<?php echo $tab; ?>">
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted">Start Date</label>
-                    <input type="date" name="start_date" class="form-control form-control-sm border-0 shadow-sm"
-                        style="border-radius: 10px;" value="<?php echo $start_date; ?>">
+                
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Search & Identity</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text border-0 bg-white"><i class="fas fa-search text-muted small"></i></span>
+                        <input type="text" name="search_code" class="form-control border-0 shadow-sm"
+                            placeholder="Code or Name" value="<?php echo $search_code; ?>" style="border-radius: 0 10px 10px 0;">
+                        <input type="text" name="inspector" class="form-control border-0 shadow-sm ms-2"
+                            placeholder="Inspector Name" value="<?php echo $inspector_filter; ?>" style="border-radius: 10px;">
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted">End Date</label>
-                    <input type="date" name="end_date" class="form-control form-control-sm border-0 shadow-sm"
-                        style="border-radius: 10px;" value="<?php echo $end_date; ?>">
-                </div>
+
                 <div class="col-md-3">
-                    <label class="form-label small fw-bold text-uppercase text-muted">Search Code/Name</label>
-                    <input type="text" name="search_code" class="form-control form-control-sm border-0 shadow-sm"
-                        style="border-radius: 10px;" placeholder="e.g. MCH-001" value="<?php echo $search_code; ?>">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Date Range</label>
+                    <div class="input-group input-group-sm">
+                        <input type="date" name="start_date" class="form-control border-0 shadow-sm"
+                            style="border-radius: 10px 0 0 10px;" value="<?php echo $start_date; ?>">
+                        <span class="input-group-text border-0 bg-white small">-</span>
+                        <input type="date" name="end_date" class="form-control border-0 shadow-sm"
+                            style="border-radius: 0 10px 10px 0;" value="<?php echo $end_date; ?>">
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted">Status</label>
-                    <select name="status" class="form-select form-select-sm border-0 shadow-sm"
-                        style="border-radius: 10px;">
-                        <option value="">-- All --</option>
-                        <option value="Pass" <?php echo $status_filter == 'Pass' ? 'selected' : ''; ?>>Pass</option>
-                        <option value="Fail" <?php echo $status_filter == 'Fail' ? 'selected' : ''; ?>>Fail</option>
-                    </select>
+
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Category & Status Filters</label>
+                    <div class="d-flex gap-2">
+                        <select name="product" class="form-select form-select-sm border-0 shadow-sm" style="border-radius: 10px;">
+                            <option value="">-- Product --</option>
+                            <?php foreach ($productTypes as $pt): ?>
+                                <option value="<?php echo $pt['name']; ?>" <?php echo $product_filter == $pt['name'] ? 'selected' : ''; ?>>
+                                    <?php echo $pt['name']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="family" class="form-select form-select-sm border-0 shadow-sm" style="border-radius: 10px;">
+                            <option value="">-- Family --</option>
+                            <?php foreach ($familyTypes as $ft): ?>
+                                <option value="<?php echo $ft['name']; ?>" <?php echo $family_filter == $ft['name'] ? 'selected' : ''; ?>>
+                                    <?php echo $ft['name']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="status" class="form-select form-select-sm border-0 shadow-sm" style="border-radius: 10px;">
+                            <option value="">-- Status --</option>
+                            <option value="Pass" <?php echo $status_filter == 'Pass' ? 'selected' : ''; ?>>Pass</option>
+                            <option value="Fail" <?php echo $status_filter == 'Fail' ? 'selected' : ''; ?>>Fail</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold text-uppercase text-muted">Inspector</label>
-                    <input type="text" name="inspector" class="form-control form-control-sm border-0 shadow-sm"
-                        style="border-radius: 10px;" placeholder="Name" value="<?php echo $inspector_filter; ?>">
-                </div>
-                <div class="col-md-1 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary btn-sm w-100 rounded-pill shadow">
-                        <i class="fas fa-search"></i>
-                    </button>
+
+                <div class="col-md-1 d-flex align-items-end justify-content-end">
+                    <div class="btn-group btn-group-sm w-100 shadow-sm" style="border-radius: 10px; overflow: hidden;">
+                        <button type="submit" class="btn btn-primary px-3">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <a href="?tab=<?php echo $tab; ?>" class="btn btn-light border-start">
+                            <i class="fas fa-sync-alt"></i>
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 <?php else: ?>
     <!-- Simple Search for Summary -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <form method="GET" class="input-group">
+    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-light">
+        <div class="card-body p-4">
+            <form method="GET" class="row g-3">
                 <input type="hidden" name="tab" value="summary">
-                <input type="text" name="search_code" class="form-control border-0 shadow-sm rounded-start-pill ps-4"
-                    placeholder="Search Machine..." value="<?php echo $search_code; ?>">
-                <button type="submit" class="btn btn-primary rounded-end-pill px-4 shadow-sm"><i
-                        class="fas fa-search"></i></button>
+                
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Search Machine</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text border-0 bg-white"><i class="fas fa-search text-muted small"></i></span>
+                        <input type="text" name="search_code" class="form-control border-0 shadow-sm"
+                            placeholder="Code or Name" value="<?php echo $search_code; ?>" style="border-radius: 0 10px 10px 0;">
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Date Range</label>
+                    <div class="input-group input-group-sm">
+                        <input type="date" name="start_date" class="form-control border-0 shadow-sm"
+                            style="border-radius: 10px 0 0 10px;" value="<?php echo $start_date; ?>">
+                        <span class="input-group-text border-0 bg-white small">-</span>
+                        <input type="date" name="end_date" class="form-control border-0 shadow-sm"
+                            style="border-radius: 0 10px 10px 0;" value="<?php echo $end_date; ?>">
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted mb-1">Category Filters</label>
+                    <div class="d-flex gap-2">
+                        <select name="product" class="form-select form-select-sm border-0 shadow-sm" style="border-radius: 10px;">
+                            <option value="">-- Product --</option>
+                            <?php foreach ($productTypes as $pt): ?>
+                                <option value="<?php echo $pt['name']; ?>" <?php echo $product_filter == $pt['name'] ? 'selected' : ''; ?>>
+                                    <?php echo $pt['name']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="family" class="form-select form-select-sm border-0 shadow-sm" style="border-radius: 10px;">
+                            <option value="">-- Family --</option>
+                            <?php foreach ($familyTypes as $ft): ?>
+                                <option value="<?php echo $ft['name']; ?>" <?php echo $family_filter == $ft['name'] ? 'selected' : ''; ?>>
+                                    <?php echo $ft['name']; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end justify-content-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1 rounded-pill shadow">
+                        <i class="fas fa-filter me-1"></i> Filter
+                    </button>
+                    <a href="?tab=summary" class="btn btn-light btn-sm rounded-pill shadow border">
+                        <i class="fas fa-sync-alt"></i>
+                    </a>
+                </div>
             </form>
         </div>
     </div>
@@ -332,12 +459,30 @@ function getPaginatedUrl($pageNo)
                                 </td>
                             </tr>
                         <?php else: ?>
-                            <?php foreach ($history as $h): ?>
+                            <?php 
+                            $currentDate = '';
+                            foreach ($history as $h): 
+                                $rowDate = date('d/m/Y', strtotime($h['created_at']));
+                                if ($rowDate !== $currentDate):
+                                    $currentDate = $rowDate;
+                                    $dayName = date('l', strtotime($h['created_at']));
+                            ?>
+                                <tr class="bg-light bg-opacity-50">
+                                    <td colspan="7" class="py-2 px-4">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary rounded-pill px-3 py-1 text-white small fw-bold shadow-sm">
+                                                <i class="far fa-calendar-alt me-2"></i><?php echo $currentDate; ?>
+                                            </div>
+                                            <span class="ms-3 text-muted small fw-bold text-uppercase"><?php echo $dayName; ?></span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                                 <tr class="align-middle border-bottom">
-                                    <td class="small">
-                                        <div class="fw-bold"><?php echo date('d/m/Y', strtotime($h['created_at'])); ?></div>
-                                        <div class="text-muted" style="font-size: 0.75rem;">
-                                            <?php echo date('H:i', strtotime($h['created_at'])); ?>
+                                    <td class="small ps-4">
+                                        <div class="fw-bold text-primary"><?php echo date('H:i', strtotime($h['created_at'])); ?></div>
+                                        <div class="text-muted" style="font-size: 0.65rem;">
+                                            <i class="far fa-clock me-1"></i> Check Time
                                         </div>
                                     </td>
                                     <td>
@@ -345,7 +490,14 @@ function getPaginatedUrl($pageNo)
                                             <?php echo $h['code']; ?>
                                         </span>
                                     </td>
-                                    <td class="small fw-medium"><?php echo $h['name']; ?></td>
+                                    <td class="small fw-medium">
+                                        <?php echo $h['name']; ?>
+                                        <?php if(isset($h['check_type']) && $h['check_type'] !== 'Daily'): ?>
+                                            <div class="badge bg-info-subtle text-info border border-info-subtle" style="font-size: 0.6rem;">
+                                                <?php echo $h['check_type']; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="small"><?php echo $h['inspector_name']; ?></td>
                                     <td>
                                         <?php
@@ -358,10 +510,10 @@ function getPaginatedUrl($pageNo)
                                         </span>
                                     </td>
                                     <td class="small text-muted" style="max-width: 200px;"><?php echo $h['remarks']; ?></td>
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-light rounded-pill px-3 shadow-xs border"
+                                    <td class="text-end pe-4">
+                                        <button class="btn btn-sm btn-white rounded-pill px-3 shadow-sm border"
                                             onclick="viewDetails(<?php echo $h['id']; ?>)">
-                                            <i class="fas fa-eye me-1 text-primary"></i> View
+                                            <i class="fas fa-search-plus me-1 text-primary"></i> Detail
                                         </button>
                                     </td>
                                 </tr>
@@ -630,7 +782,7 @@ function getPaginatedUrl($pageNo)
                             <td>${m.machine_name}</td>
                             <td><span class="small text-muted">${m.product} / ${m.family}</span></td>
                             <td class="text-end pe-4">
-                                <a href="check_form?machine_id=${m.id}" class="btn btn-sm btn-primary rounded-pill px-3">Check Now</a>
+                                <a href="check_form.php?machine_id=${m.id}" class="btn btn-sm btn-primary rounded-pill px-3">Check Now</a>
                             </td>
                         </tr>`;
                 });

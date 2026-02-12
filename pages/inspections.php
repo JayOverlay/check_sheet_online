@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_inspection'])) {
                 $stmt->execute([$name_en, $name_th, $unit, $default_target, $default_plus, $default_minus, $id]);
             }
         }
-        header("Location: inspections?success=1");
+        header("Location: inspections.php?success=1");
         exit();
     } catch (Exception $e) {
         $error = "Error: " . $e->getMessage();
@@ -53,7 +53,7 @@ if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
     try {
         $pdo->prepare("DELETE FROM inspections_master WHERE id = ?")->execute([$id]);
-        header("Location: inspections?deleted=1");
+        header("Location: inspections.php?deleted=1");
         exit();
     } catch (Exception $e) {
         $error = "Error: " . $e->getMessage();

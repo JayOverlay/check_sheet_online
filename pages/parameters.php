@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_param'])) {
             $stmt = $pdo->prepare("UPDATE parameters_master SET name_en = ?, name_th = ?, unit = ?, default_target = ?, default_plus = ?, default_minus = ? WHERE id = ?");
             $stmt->execute([$name_en, $name_th, $unit, $default_target, $default_plus, $default_minus, $id]);
         }
-        header("Location: parameters?success=1");
+        header("Location: parameters.php?success=1");
         exit();
     } catch (Exception $e) {
         $error = "Error: " . $e->getMessage();
@@ -32,7 +32,7 @@ if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
     try {
         $pdo->prepare("DELETE FROM parameters_master WHERE id = ?")->execute([$id]);
-        header("Location: parameters?deleted=1");
+        header("Location: parameters.php?deleted=1");
         exit();
     } catch (Exception $e) {
         $error = "Error: " . $e->getMessage();

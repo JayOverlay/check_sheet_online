@@ -93,7 +93,7 @@ try {
         <div class="card card-premium">
             <div class="card-header bg-transparent border-0 p-4 pb-0 d-flex justify-content-between align-items-center">
                 <h5 class="fw-bold mb-0">Recent Inspections</h5>
-                <a href="history" class="btn btn-sm btn-outline-primary rounded-pill">View All</a>
+                <a href="pages/history.php" class="btn btn-sm btn-outline-primary rounded-pill">View All</a>
             </div>
             <div class="card-body p-4">
                 <div class="table-responsive">
@@ -165,7 +165,7 @@ try {
                     <i class="fas fa-plus me-2"></i> New Inspection
                 </button>
                 <div class="list-group list-group-flush">
-                    <a href="machines" class="list-group-item list-group-item-action border-0 px-0 py-3">
+                    <a href="pages/machines.php" class="list-group-item list-group-item-action border-0 px-0 py-3">
                         <div class="d-flex w-100 justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-industry me-3 text-primary"></i>
@@ -174,7 +174,7 @@ try {
                             <i class="fas fa-chevron-right small text-muted"></i>
                         </div>
                     </a>
-                    <a href="tooling" class="list-group-item list-group-item-action border-0 px-0 py-3">
+                    <a href="pages/tooling.php" class="list-group-item list-group-item-action border-0 px-0 py-3">
                         <div class="d-flex w-100 justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-tools me-3 text-success"></i>
@@ -183,7 +183,7 @@ try {
                             <i class="fas fa-chevron-right small text-muted"></i>
                         </div>
                     </a>
-                    <a href="templates" class="list-group-item list-group-item-action border-0 px-0 py-3">
+                    <a href="pages/check_master.php" class="list-group-item list-group-item-action border-0 px-0 py-3">
                         <div class="d-flex w-100 justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-list-check me-3 text-warning"></i>
@@ -312,7 +312,7 @@ try {
                             <td>${m.machine_name}</td>
                             <td><span class="small text-muted">${m.product} / ${m.family}</span></td>
                             <td class="text-end pe-4">
-                                <a href="check_form?machine_id=${m.id}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-xs">
+                                <a href="pages/check_form.php?machine_id=${m.id}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-xs">
                                     <i class="fas fa-plus me-1"></i> Check Now
                                 </a>
                             </td>

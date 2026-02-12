@@ -37,16 +37,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$username, $hashed_password, $full_name, $email, $role, $status, $department]);
         }
 
-        header("Location: " . BASE_URL . "users?success=1");
+        header("Location: " . BASE_URL . "pages/users.php?success=1");
         exit();
     } catch (Exception $e) {
         // Redirect back with error message for better UX
         $error_msg = urlencode($e->getMessage());
-        header("Location: " . BASE_URL . "users?error=save_failed&details=$error_msg");
+        header("Location: " . BASE_URL . "pages/users.php?error=save_failed&details=$error_msg");
         exit();
     }
 } else {
-    header("Location: " . BASE_URL . "users");
+    header("Location: " . BASE_URL . "pages/users.php");
     exit();
 }
 ?>

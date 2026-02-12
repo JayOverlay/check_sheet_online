@@ -3,22 +3,22 @@ require_once '../config/database.php';
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: " . BASE_URL . "login");
+    header("Location: " . BASE_URL . "login.php");
     exit();
 }
 
 if (isset($_GET['id'])) {
     $id = $_GET['id'];
     try {
-        $stmt = $pdo->prepare("DELETE FROM machines WHERE id = ?");
+        $stmt = $pdo->prepare("UPDATE machines SET status = 'Inactive' WHERE id = ?");
         $stmt->execute([$id]);
-        header("Location: " . BASE_URL . "machines?deleted=1");
+        header("Location: " . BASE_URL . "pages/machines.php?deleted=1");
         exit();
     } catch (Exception $e) {
-        header("Location: " . BASE_URL . "machines?error=1");
+        header("Location: " . BASE_URL . "pages/machines.php?error=1");
         exit();
     }
 }
-header("Location: " . BASE_URL . "machines");
+header("Location: " . BASE_URL . "pages/machines.php");
 exit();
 ?>

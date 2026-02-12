@@ -1,14 +1,20 @@
 <?php
 require_once __DIR__ . '/env.php';
+date_default_timezone_set('Asia/Bangkok');
 
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'check_sheet_db');
 
-// Detect Base URL
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+// Detect Protocol
+$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+
+/**
+ * STABLE BASE_URL DEFINITION
+ * Since the project is installed in the 'check_sheet_online' folder on XAMPP.
+ */
 define('BASE_URL', "$protocol://$host/check_sheet_online/");
 
 try {
@@ -18,4 +24,3 @@ try {
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }
-?>

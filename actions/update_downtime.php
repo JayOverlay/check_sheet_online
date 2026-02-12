@@ -3,7 +3,7 @@ require_once '../config/database.php';
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: " . BASE_URL . "login");
+    header("Location: " . BASE_URL . "login.php");
     exit();
 }
 
@@ -83,14 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
-        header("Location: " . BASE_URL . "downtime?success=1");
+        header("Location: " . BASE_URL . "pages/downtime.php?success=1");
         exit();
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        header("Location: " . BASE_URL . "downtime?error=1&details=" . urlencode($e->getMessage()));
+        header("Location: " . BASE_URL . "pages/downtime.php?error=1&details=" . urlencode($e->getMessage()));
         exit();
     }
 }

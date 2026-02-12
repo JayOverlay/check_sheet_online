@@ -24,7 +24,7 @@ $history = $pdo->query($sql)->fetchAll();
         <p class="text-muted">History of machine inspections</p>
     </div>
     <div class="col-md-4 text-md-end">
-        <a href="machines" class="btn btn-primary rounded-pill shadow-sm">
+        <a href="machines.php" class="btn btn-primary rounded-pill shadow-sm">
             <i class="fas fa-plus me-2"></i> New Check
         </a>
     </div>
@@ -147,7 +147,7 @@ $history = $pdo->query($sql)->fetchAll();
         document.getElementById('detailBody').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Loading details...</td></tr>';
         detailModal.show();
 
-        fetch(`<?php echo BASE_URL; ?>get_check_sheet_details?id=${sheetId}`)
+        fetch(`<?php echo BASE_URL; ?>actions/get_check_sheet_details.php?id=${sheetId}`)
             .then(res => res.json())
             .then(data => {
                 if (data.error) {

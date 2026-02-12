@@ -112,7 +112,7 @@ try {
                                     <button class="btn btn-sm btn-light rounded-circle me-1"><i
                                             class="fas fa-edit text-primary"></i></button>
                                     <button class="btn btn-sm btn-light rounded-circle"
-                                        onclick="confirmDelete('delete_tooling?id=<?php echo $t['id']; ?>')">
+                                        onclick="confirmDelete('../actions/delete_tooling.php?id=<?php echo $t['id']; ?>')">
                                         <i class="fas fa-trash text-danger"></i>
                                     </button>
                                 </td>

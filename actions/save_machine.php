@@ -18,12 +18,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $file_extension = pathinfo($_FILES["machine_image"]["name"], PATHINFO_EXTENSION);
-        $file_name = $machine_code . "_" . time() . "." . $file_extension;
+        $clean_code = preg_replace('/[^A-Za-z0-9_\-]/', '', $machine_code);
+        $file_name = $clean_code . "_" . time() . "." . $file_extension;
         $target_file = $target_dir . $file_name;
 
-        if (move_uploaded_file($_FILES["machine_image"]["tmp_name"], $target_file)) {
-            $image_path = $target_file;
+        // Debug upload
+        if (!move_uploaded_file($_FILES["machine_image"]["tmp_name"], "../" . $target_file)) {
+            // Try absolute path if relative fails, or just handle error
+            if (!move_uploaded_file($_FILES["machine_image"]["tmp_name"], $target_file)) {
+                throw new Exception("Failed to move uploaded file. Check permissions for $target_dir");
+            }
         }
+        $image_path = $target_file; // Store relative path for DB
     }
 
     $id = $_POST['machine_id'] ?? ''; // Check if ID exists for Edit
@@ -43,6 +49,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $params = [$machine_code, $serial_number, $machine_name, $product, $family, $status];
 
             if (!empty($image_path)) {
+                // Fetch old image to delete
+                $oldImgStmt = $pdo->prepare("SELECT image_path FROM machines WHERE id = ?");
+                $oldImgStmt->execute([$machine_id]);
+                $oldImg = $oldImgStmt->fetchColumn();
+
+                // Delete if exists
+                if ($oldImg && file_exists("../" . $oldImg)) {
+                    unlink("../" . $oldImg);
+                }
+
                 $sql .= ", image_path=?";
                 $params[] = $image_path;
             }
@@ -96,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $pdo->commit();
 
-        header("Location: " . BASE_URL . "machines?success=1");
+        header("Location: " . BASE_URL . "pages/machines.php?success=1");
         exit();
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
@@ -105,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         die("Error saving machine: " . $e->getMessage());
     }
 } else {
-    header("Location: " . BASE_URL . "machines");
+    header("Location: " . BASE_URL . "pages/machines.php");
     exit();
 }
 ?>

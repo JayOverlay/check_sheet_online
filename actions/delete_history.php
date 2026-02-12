@@ -15,14 +15,14 @@ if (isset($_GET['id'])) {
         // Delete main record
         $pdo->prepare("DELETE FROM check_sheets WHERE id = ?")->execute([$id]);
         $pdo->commit();
-        header("Location: " . BASE_URL . "history?deleted=1");
+        header("Location: " . BASE_URL . "pages/history.php?deleted=1");
         exit();
     } catch (Exception $e) {
         $pdo->rollBack();
-        header("Location: " . BASE_URL . "history?error=1");
+        header("Location: " . BASE_URL . "pages/history.php?error=1");
         exit();
     }
 }
-header("Location: " . BASE_URL . "history");
+header("Location: " . BASE_URL . "pages/history.php");
 exit();
 ?>

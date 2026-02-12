@@ -5,7 +5,7 @@ require_once '../config/database.php';
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_item'])) {
     session_start();
     if (!isset($_SESSION['user_id'])) {
-        header("Location: " . BASE_URL . "login");
+        header("Location: " . BASE_URL . "login.php");
         exit();
     }
 
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_item'])) {
             $stmt = $pdo->prepare("UPDATE check_items SET item_code = ?, name_en = ?, name_th = ?, category = ? WHERE id = ?");
             $stmt->execute([$item_code, $name_en, $name_th, $category, $id]);
         }
-        header("Location: " . BASE_URL . "check_master?success=1");
+        header("Location: " . BASE_URL . "pages/check_master.php?success=1");
         exit();
     } catch (Exception $e) {
         $error = "Error: " . $e->getMessage();
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_item'])) {
 if (isset($_GET['delete'])) {
     session_start();
     if (!isset($_SESSION['user_id'])) {
-        header("Location: " . BASE_URL . "login");
+        header("Location: " . BASE_URL . "login.php");
         exit();
     }
 
@@ -45,7 +45,7 @@ if (isset($_GET['delete'])) {
         // Also remove from mapping table to maintain integrity
         $pdo->prepare("DELETE FROM machine_check_items WHERE check_item_id = ?")->execute([$id]);
         $pdo->prepare("DELETE FROM check_items WHERE id = ?")->execute([$id]);
-        header("Location: " . BASE_URL . "check_master?deleted=1");
+        header("Location: " . BASE_URL . "pages/check_master.php?deleted=1");
         exit();
     } catch (Exception $e) {
         $error = "Error: " . $e->getMessage();
@@ -260,7 +260,7 @@ function getPaginatedUrl($p) {
 <div class="modal fade" id="itemModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form method="POST" action="<?php echo BASE_URL; ?>check_master">
+            <form method="POST" action="<?php echo BASE_URL; ?>pages/check_master.php">
                 <input type="hidden" name="id" id="item_id">
                 <div class="modal-header border-0 p-4 pb-0">
                     <h5 class="fw-bold mb-0" id="modalTitle">Add Check Item</h5>

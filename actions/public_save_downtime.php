@@ -1,23 +1,16 @@
 <?php
 require_once '../config/database.php';
-session_start();
-
-if (!isset($_SESSION['user_id'])) {
-    header("Location: " . BASE_URL . "login.php");
-    exit();
-}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $target_str = $_POST['target_id'] ?? ''; // m_1 or t_5
+    $target_str = $_POST['target_id'] ?? '';
     $category = $_POST['category'] ?? '';
     $problem = $_POST['problem'] ?? '';
-    $reported_by = $_SESSION['full_name']; // Store name for simple display
+    $reported_by = $_POST['reported_by'] ?? 'Guest';
 
     // Parse target
     $parts = explode('_', $target_str);
     if (count($parts) < 2) {
-        header("Location: " . BASE_URL . "pages/downtime.php?error=invalid_target");
-        exit();
+        die("Error: Invalid Target");
     }
     $type_prefix = $parts[0];
     $ref_id = $parts[1];
@@ -26,11 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     try {
         $pdo->beginTransaction();
 
-        // 1. Create Downtime Record
-        $stmt = $pdo->prepare("INSERT INTO downtime (ref_id, ref_type, category, problem, reported_by, status) VALUES (?, ?, ?, ?, ?, 'Reported')");
+        $stmt = $pdo->prepare("INSERT INTO downtime (ref_id, ref_type, category, problem, reported_by, status, created_at) VALUES (?, ?, ?, ?, ?, 'Reported', NOW())");
         $stmt->execute([$ref_id, $type, $category, $problem, $reported_by]);
 
-        // 2. Update Asset Status to Maintenance
         if ($type == 'machine') {
             $pdo->prepare("UPDATE machines SET status = 'Maintenance' WHERE id = ?")->execute([$ref_id]);
         } else {
@@ -38,16 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $pdo->commit();
-        header("Location: " . BASE_URL . "pages/downtime.php?success=1");
+        header("Location: " . BASE_URL . "pages/scan.php?machine_id=$ref_id&success=downtime_reported");
         exit();
 
     } catch (Exception $e) {
         $pdo->rollBack();
-        header("Location: " . BASE_URL . "pages/downtime.php?error=save_failed&details=" . urlencode($e->getMessage()));
+        header("Location: " . BASE_URL . "pages/public_downtime.php?machine_id=$ref_id&error=" . urlencode($e->getMessage()));
         exit();
     }
 } else {
-    header("Location: " . BASE_URL . "pages/downtime.php");
+    header("Location: " . BASE_URL . "pages/scan.php");
     exit();
 }
 ?>

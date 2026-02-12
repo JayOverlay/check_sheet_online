@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $dupStmt->execute([$target_id, $shiftStart, $shiftEnd]);
     if ($dupStmt->fetchColumn() > 0) {
         $msg = urlencode("เครื่องจักรนี้ถูกลงข้อมูลสำหรับ $shiftLabel เรียบร้อยแล้ว ไม่สามารถลงซ้ำได้");
-        header("Location: " . BASE_URL . "pages/check_form.php?machine_id=$machine_id&employee_id=$employee_id&error=$msg");
+        header("Location: " . BASE_URL . "pages/public_check.php?machine_id=$machine_id&employee_id=$employee_id&error=$msg");
         exit();
     }
     // --- End Duplicate Check ---
@@ -104,15 +104,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $pdo->commit();
 
         // 6. Redirect to Success Page
-        // Redirect back to machines page since check_history might not exist yet
-        header("Location: " . BASE_URL . "pages/machines.php?success=check_completed");
+        // Redirect back to scan page
+        header("Location: " . BASE_URL . "pages/scan.php?machine_id=$machine_id&success=check_completed");
         exit();
 
     } catch (Exception $e) {
         $pdo->rollBack();
         // Log error and redirect with error message
         $error_msg = urlencode($e->getMessage());
-        header("Location: " . BASE_URL . "pages/check_form.php?machine_id=$machine_id&employee_id=$employee_id&error=$error_msg");
+        header("Location: " . BASE_URL . "pages/public_check.php?machine_id=$machine_id&employee_id=$employee_id&error=$error_msg");
         exit();
     }
 } else {

@@ -208,7 +208,7 @@ try {
                                 </td>
                                 <td class="text-end">
                                     <?php if ($r['status'] == 'Reported' && ($_SESSION['role'] == 'leader' || $_SESSION['role'] == 'admin' || $_SESSION['role'] == 'Technicien')): ?>
-                                        <form action="update_downtime.php" method="POST" class="d-inline">
+                                        <form action="../actions/update_downtime.php" method="POST" class="d-inline">
                                             <input type="hidden" name="action" value="call_tech">
                                             <input type="hidden" name="downtime_id" value="<?php echo $r['id']; ?>">
                                             <button type="submit"
@@ -217,7 +217,7 @@ try {
                                             </button>
                                         </form>
                                     <?php elseif ($r['status'] == 'Waiting for Technician' && ($_SESSION['role'] == 'Technicien' || $_SESSION['role'] == 'admin')): ?>
-                                        <form action="update_downtime.php" method="POST" class="d-inline">
+                                        <form action="../actions/update_downtime.php" method="POST" class="d-inline">
                                             <input type="hidden" name="action" value="accept">
                                             <input type="hidden" name="downtime_id" value="<?php echo $r['id']; ?>">
                                             <button type="submit" class="btn btn-sm btn-outline-info rounded-pill px-3 shadow-xs">
@@ -281,7 +281,7 @@ try {
 <div class="modal fade" id="reportModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="save_downtime.php" method="POST">
+            <form action="../actions/save_downtime.php" method="POST">
                 <div class="modal-header border-0 p-4 pb-0">
                     <h5 class="fw-bold mb-0">Report Issue / แจ้งซ่อม</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -337,7 +337,7 @@ try {
 <div class="modal fade" id="finishModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="update_downtime.php" method="POST">
+            <form action="../actions/update_downtime.php" method="POST">
                 <input type="hidden" name="action" value="finish">
                 <input type="hidden" name="downtime_id" id="finish_id">
                 <div class="modal-header border-0 p-4 pb-0">
@@ -368,7 +368,7 @@ try {
 <div class="modal fade" id="verifyModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="update_downtime.php" method="POST">
+            <form action="../actions/update_downtime.php" method="POST">
                 <input type="hidden" name="downtime_id" id="verify_id">
                 <!-- Action will be set by button -->
 
@@ -401,17 +401,34 @@ try {
     </div>
 </div>
 
-<script>
-    function openFinishModal(id) {
-        document.getElementById('finish_id').value = id;
-        new bootstrap.Modal(document.getElementById('finishModal')).show();
-    }
+function openFinishModal(id) {
+document.getElementById('finish_id').value = id;
+new bootstrap.Modal(document.getElementById('finishModal')).show();
+}
 
-    function openVerifyModal(id, solution) {
-        document.getElementById('verify_id').value = id;
-        document.getElementById('tech_solution').innerText = solution;
-        new bootstrap.Modal(document.getElementById('verifyModal')).show();
-    }
+function openVerifyModal(id, solution) {
+document.getElementById('verify_id').value = id;
+document.getElementById('tech_solution').innerText = solution;
+new bootstrap.Modal(document.getElementById('verifyModal')).show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+// Auto-open Report Modal if params exist
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.has('report')) {
+const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+reportModal.show();
+
+if (urlParams.has('machine_id')) {
+const mid = 'm_' + urlParams.get('machine_id');
+const select = document.querySelector('select[name="target_id"]');
+if(select) {
+select.value = mid;
+// Trigger change if needed, though native select usually doesn't need it for internal display
+}
+}
+}
+});
 </script>
 
 <?php include '../includes/footer.php'; ?>
