@@ -43,7 +43,7 @@ try {
         $join = "JOIN machines m ON SUBSTRING_INDEX(cs.target_id, '_', -1) = m.id";
         $select_fields = "m.machine_code as code, m.machine_name as name";
     } elseif ($tab == 'tooling') {
-        $where_clauses[] = "cs.target_id LIKE 't_%' AND (cs.check_type = 'Daily' OR cs.check_type IS NULL)";
+        $where_clauses[] = "cs.target_id LIKE 't_%' AND (cs.check_type = 'Tooling' OR cs.check_type = 'Daily' OR cs.check_type IS NULL)";
         $join = "JOIN tooling t ON SUBSTRING_INDEX(cs.target_id, '_', -1) = t.id";
         $select_fields = "t.tool_code as code, t.tool_name as name";
     } elseif ($tab == 'parameter') {
@@ -56,6 +56,14 @@ try {
         $select_fields = "m.machine_code as code, m.machine_name as name";
     } elseif ($tab == 'customer') {
         $where_clauses[] = "cs.check_type = 'Customer'";
+        $join = "JOIN machines m ON SUBSTRING_INDEX(cs.target_id, '_', -1) = m.id";
+        $select_fields = "m.machine_code as code, m.machine_name as name";
+    } elseif ($tab == 'safety') {
+        $where_clauses[] = "cs.check_type = 'Safety'";
+        $join = "JOIN machines m ON SUBSTRING_INDEX(cs.target_id, '_', -1) = m.id";
+        $select_fields = "m.machine_code as code, m.machine_name as name";
+    } elseif ($tab == 'machine') {
+        $where_clauses[] = "cs.target_id LIKE 'm_%' AND (cs.check_type = 'Machine' OR cs.check_type = 'Daily' OR cs.check_type IS NULL)";
         $join = "JOIN machines m ON SUBSTRING_INDEX(cs.target_id, '_', -1) = m.id";
         $select_fields = "m.machine_code as code, m.machine_name as name";
     }
@@ -212,22 +220,34 @@ function getPaginatedUrl($pageNo)
         <button class="btn btn-warning btn-sm rounded-pill px-3 shadow-sm border-0" onclick="showMissingModal()">
             <i class="fas fa-exclamation-triangle me-1"></i> Missing Today
         </button>
-        <div class="btn-group shadow-sm rounded-pill p-1 bg-white">
+        <div class="btn-group shadow-sm rounded-pill p-1 bg-white flex-wrap">
             <a href="?tab=summary"
                 class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'summary' ? 'btn-primary' : 'btn-light'; ?>">
                 <i class="fas fa-chart-pie me-1"></i> Summary
             </a>
             <a href="?tab=machine"
                 class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'machine' ? 'btn-primary' : 'btn-light'; ?>">
-                <i class="fas fa-industry me-1"></i> Logs (Machine)
+                <i class="fas fa-industry me-1"></i> Machine
             </a>
-            <a href="?tab=tooling"
-                class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'tooling' ? 'btn-primary' : 'btn-light'; ?>">
-                <i class="fas fa-tools me-1"></i> Logs (Tool)
+            <a href="?tab=safety"
+                class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'safety' ? 'btn-primary' : 'btn-light'; ?>">
+                <i class="fas fa-shield-alt me-1"></i> Safety
+            </a>
+            <a href="?tab=customer"
+                class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'customer' ? 'btn-primary' : 'btn-light'; ?>">
+                <i class="fas fa-user-check me-1"></i> Customer
             </a>
             <a href="?tab=parameter"
                 class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'parameter' ? 'btn-primary' : 'btn-light'; ?>">
                 <i class="fas fa-sliders-h me-1"></i> Parameter
+            </a>
+            <a href="?tab=inspection"
+                class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'inspection' ? 'btn-primary' : 'btn-light'; ?>">
+                <i class="fas fa-search me-1"></i> Inspection
+            </a>
+            <a href="?tab=tooling"
+                class="btn btn-sm rounded-pill px-3 <?php echo $tab == 'tooling' ? 'btn-primary' : 'btn-light'; ?>">
+                <i class="fas fa-tools me-1"></i> Tooling
             </a>
         </div>
     </div>
@@ -372,7 +392,7 @@ function getPaginatedUrl($pageNo)
                 <table class="table table-custom align-middle">
                     <thead>
                         <tr>
-                            <th>Machine</th>
+                            <th class="col-code">Machine</th>
                             <th>Total Checks</th>
                             <th style="width: 250px;">Pass Rate</th>
                             <th>Latest Date</th>
@@ -438,9 +458,9 @@ function getPaginatedUrl($pageNo)
                         <tr>
                             <th>Date / Time</th>
                             <?php if ($tab == 'machine' || $tab == 'parameter' || $tab == 'inspection'): ?>
-                                <th>Machine Code</th>
+                                <th class="col-code">Machine Code</th>
                             <?php else: ?>
-                                <th>Tool Code</th>
+                                <th class="col-code">Tool Code</th>
                             <?php endif; ?>
                             <th>Name</th>
                             <th>Inspector</th>
@@ -602,7 +622,7 @@ function getPaginatedUrl($pageNo)
                             <thead class="bg-light text-secondary small text-uppercase"
                                 style="position: sticky; top: 0; z-index: 10;">
                                 <tr>
-                                    <th class="ps-4">Code</th>
+                                    <th class="ps-4 col-code">Code</th>
                                     <th>Check Item</th>
                                     <th class="text-center">Result</th>
                                     <th>Comment</th>
@@ -638,7 +658,7 @@ function getPaginatedUrl($pageNo)
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light text-secondary small text-uppercase">
                             <tr>
-                                <th class="ps-4">Code</th>
+                                <th class="ps-4 col-code">Code</th>
                                 <th>Machine Name</th>
                                 <th>PF / Family</th>
                                 <th class="text-end pe-4">Action</th>
@@ -674,8 +694,15 @@ function getPaginatedUrl($pageNo)
 
         // 1. Fetch History List
         fetch(`<?php echo BASE_URL; ?>actions/get_machine_logs.php?id=${machineId}`)
-            .then(res => res.json())
-            .then(data => {
+            .then(res => res.text())
+            .then(text => {
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error('Invalid JSON response:', text.substring(0, 500));
+                    throw new Error('Server returned invalid response. Please refresh and try again.');
+                }
                 if (!data.success) throw new Error(data.error);
 
                 document.getElementById('unifiedMachineName').textContent = data.machine.machine_name;
@@ -712,8 +739,15 @@ function getPaginatedUrl($pageNo)
         document.getElementById('unifiedContent').classList.add('d-none');
 
         fetch(`<?php echo BASE_URL; ?>actions/get_check_sheet_details.php?id=${sheetId}`)
-            .then(res => res.json())
-            .then(data => {
+            .then(res => res.text())
+            .then(text => {
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error('Invalid JSON response:', text.substring(0, 500));
+                    throw new Error('Server returned invalid response. Please refresh and try again.');
+                }
                 if (data.error) throw new Error(data.error);
 
                 document.getElementById('unifiedLoading').classList.add('d-none');
@@ -722,7 +756,7 @@ function getPaginatedUrl($pageNo)
                 const info = data.header;
                 document.getElementById('unifiedInspector').textContent = info.inspector_name;
                 document.getElementById('unifiedDate').textContent = new Date(info.created_at).toLocaleString('th-TH');
-                document.getElementById('unifiedCount').textContent = data.details.length + ' items';
+                document.getElementById('unifiedCount').textContent = (info.check_type || 'Daily') + ' | ' + data.details.length + ' items';
                 document.getElementById('unifiedMachineName').textContent = info.machine_name || 'Details';
                 document.getElementById('unifiedMachineCode').textContent = info.machine_code || info.target_id;
 

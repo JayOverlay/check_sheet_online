@@ -120,7 +120,7 @@ $history = $pdo->query($sql)->fetchAll();
                     <table class="table align-middle mb-0">
                         <thead class="bg-white text-secondary small text-uppercase">
                             <tr>
-                                <th class="ps-4">Code</th>
+                                <th class="ps-4 col-code">Code</th>
                                 <th>Check Item</th>
                                 <th class="text-center">Result</th>
                                 <th>Comment</th>

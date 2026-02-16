@@ -1,6 +1,7 @@
 <?php
 require_once '../config/database.php';
 include '../includes/header.php';
+include '../includes/admin_guard.php';
 
 // Handle Add / Edit Master Inspection
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_inspection'])) {

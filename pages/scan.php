@@ -40,7 +40,7 @@ if (isset($_GET['error'])) {
     <!-- Font Awesome -->
     <link href="<?php echo BASE_URL; ?>assets/libs/fontawesome/css/all.min.css" rel="stylesheet">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>assets/css/inter.css" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -125,34 +125,81 @@ if (isset($_GET['error'])) {
                     <?php if ($machineInfo['status'] != 'Inactive'): ?>
                         <!-- Action Cards -->
                         <div class="row g-3">
-                            <!-- Check Machine -->
-                            <div class="col-6">
-                                <a href="public_check.php?machine_id=<?php echo $machineId; ?>" class="text-decoration-none">
-                                    <div class="card h-100 border-0 shadow-sm card-option"
-                                        style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
-                                        <div class="card-body p-4 text-center text-white">
-                                            <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                                                style="width: 60px; height: 60px;">
-                                                <i class="fas fa-clipboard-check fa-2x"></i>
-                                            </div>
-                                            <h5 class="fw-bold mb-1">Check</h5>
-                                            <p class="small mb-0 opacity-75">ลงบันทึกประจำวัน</p>
-                                        </div>
-                                    </div>
-                                </a>
-                            </div>
+                            <?php
+                            // Fetch distinct categories for this machine
+                            $stmt = $pdo->prepare("
+                                SELECT DISTINCT ci.category 
+                                FROM check_items ci 
+                                INNER JOIN machine_check_items mci ON ci.id = mci.check_item_id 
+                                WHERE mci.machine_id = ?
+                            ");
+                            $stmt->execute([$machineId]);
+                            $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-                            <!-- Repair Notification -->
+                            // Define Display Names and Icons for Categories
+                            $categoryMap = [
+                                'Safety' => ['name' => 'Safety', 'icon' => 'fa-shield-alt', 'color' => '#10b981'],
+                                'Customer' => ['name' => 'Customer Requirement', 'icon' => 'fa-user-check', 'color' => '#f59e0b'],
+                                'Machine' => ['name' => 'Machine', 'icon' => 'fa-cogs', 'color' => '#3b82f6'],
+                                'Parameter' => ['name' => 'Parameter Check', 'icon' => 'fa-sliders-h', 'color' => '#8b5cf6'],
+                                'Inspection' => ['name' => 'Visual Inspec', 'icon' => 'fa-search', 'color' => '#ec4899'],
+                                'Tooling' => ['name' => 'Tooling Specific', 'icon' => 'fa-tools', 'color' => '#64748b'],
+                                'Common' => ['name' => 'General Check', 'icon' => 'fa-clipboard-list', 'color' => '#6b7280']
+                            ];
+
+                            foreach ($categories as $cat):
+                                $display = $categoryMap[$cat] ?? ['name' => $cat, 'icon' => 'fa-tasks', 'color' => '#4f46e5'];
+                                ?>
+                                <div class="col-6">
+                                    <a href="public_check.php?machine_id=<?php echo $machineId; ?>&type=<?php echo urlencode($cat); ?>"
+                                        class="text-decoration-none">
+                                        <div class="card h-100 border-0 shadow-sm card-option"
+                                            style="background: <?php echo $display['color']; ?>;">
+                                            <div class="card-body p-4 text-center text-white">
+                                                <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                                                    style="width: 50px; height: 50px;">
+                                                    <i class="fas <?php echo $display['icon']; ?> fa-lg"></i>
+                                                </div>
+                                                <h6 class="fw-bold mb-1" style="font-size: 0.9rem;">
+                                                    <?php echo $display['name']; ?>
+                                                </h6>
+                                                <p class="small mb-0 opacity-75" style="font-size: 0.7rem;">ตรวจสอบหัวข้อนี้</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
+                            <?php endforeach; ?>
+
+                            <!-- If no categories found, show default check -->
+                            <?php if (empty($categories)): ?>
+                                <div class="col-6">
+                                    <a href="public_check.php?machine_id=<?php echo $machineId; ?>" class="text-decoration-none">
+                                        <div class="card h-100 border-0 shadow-sm card-option"
+                                            style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
+                                            <div class="card-body p-4 text-center text-white">
+                                                <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                                                    style="width: 50px; height: 50px;">
+                                                    <i class="fas fa-clipboard-check fa-lg"></i>
+                                                </div>
+                                                <h6 class="fw-bold mb-1">Check Machine</h6>
+                                                <p class="small mb-0 opacity-75">ลงบันทึกประจำวัน</p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
+
+                            <!-- Repair Notification (Always show) -->
                             <div class="col-6">
                                 <a href="public_downtime.php?machine_id=<?php echo $machineId; ?>" class="text-decoration-none">
                                     <div class="card h-100 border-0 shadow-sm card-option"
                                         style="background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);">
                                         <div class="card-body p-4 text-center text-white">
                                             <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                                                style="width: 60px; height: 60px;">
-                                                <i class="fas fa-tools fa-2x"></i>
+                                                style="width: 50px; height: 50px;">
+                                                <i class="fas fa-tools fa-lg"></i>
                                             </div>
-                                            <h5 class="fw-bold mb-1">Repair</h5>
+                                            <h6 class="fw-bold mb-1">Repair</h6>
                                             <p class="small mb-0 opacity-75">แจ้งซ่อม/ปัญหา</p>
                                         </div>
                                     </div>

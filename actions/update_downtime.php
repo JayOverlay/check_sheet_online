@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($action == 'call_tech') {
             // Reported -> Waiting for Technician
             // Allows Leader/Admin/Tech to acknowledge and call for repair
-            $pdo->prepare("UPDATE downtime SET status = 'Waiting for Technician' WHERE id = ?")
+            $pdo->prepare("UPDATE downtime SET status = 'Waiting for Technician', called_at = NOW() WHERE id = ?")
                 ->execute([$id]);
 
         } elseif ($action == 'accept') {
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($role !== 'Technicien' && $role !== 'admin')
                 throw new Exception("Unauthorized");
 
-            $pdo->prepare("UPDATE downtime SET status = 'In Progress', technician_id = ? WHERE id = ?")
+            $pdo->prepare("UPDATE downtime SET status = 'In Progress', technician_id = ?, accepted_at = NOW() WHERE id = ?")
                 ->execute([$user_id, $id]);
 
         } elseif ($action == 'finish') {
@@ -45,10 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 throw new Exception("Unauthorized");
 
             $solution = $_POST['solution'] ?? '';
+            $remarks = $_POST['remarks'] ?? '';
             // Status: In Progress -> Technician Finished
             // Assign technician_id at finish time if oversight (redundancy)
-            $pdo->prepare("UPDATE downtime SET status = 'Technician Finished', solution = ?, technician_id = COALESCE(technician_id, ?), fixed_at = NOW() WHERE id = ?")
-                ->execute([$solution, $user_id, $id]);
+            $pdo->prepare("UPDATE downtime SET status = 'Technician Finished', solution = ?, remarks = ?, technician_id = ?, fixed_at = NOW() WHERE id = ?")
+                ->execute([$solution, $remarks, $user_id, $id]);
 
         } elseif ($action == 'verify') {
             // Leader approves
@@ -56,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 throw new Exception("Unauthorized");
 
             $comment = $_POST['leader_comment'] ?? 'Verified OK';
-            $pdo->prepare("UPDATE downtime SET status = 'Ready', leader_id = ?, leader_comment = ? WHERE id = ?")
+            $pdo->prepare("UPDATE downtime SET status = 'Ready', leader_id = ?, leader_comment = ?, verified_at = NOW() WHERE id = ?")
                 ->execute([$user_id, $comment, $id]);
 
             // Set Asset back to Active
@@ -69,7 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($role !== 'leader' && $role !== 'admin')
                 throw new Exception("Unauthorized");
 
-            $comment = $_POST['leader_comment'] ?? '';
+            $comment = trim($_POST['leader_comment'] ?? '');
+            if (empty($comment)) {
+                throw new Exception("Reason for rejection is required");
+            }
 
             // 1. Close current
             $rejectMsg = "Rejected: " . $comment;
@@ -77,9 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 ->execute([$user_id, $rejectMsg, $id]);
 
             // 2. Open new ticket
-            $newProblem = "Re-opened (Previous ID #$id): " . $comment;
-            $pdo->prepare("INSERT INTO downtime (ref_id, ref_type, category, problem, reported_by, status) VALUES (?, ?, ?, ?, ?, 'Reported')")
-                ->execute([$ticket['ref_id'], $ticket['ref_type'], $ticket['category'], $newProblem, $_SESSION['full_name']]);
+            // Use the leader's comment directly as the new problem description
+            $newProblem = $comment;
+            $pdo->prepare("INSERT INTO downtime (ref_id, ref_type, category, problem, reported_by, status, reported_at) VALUES (?, ?, ?, ?, ?, 'Reported', NOW())")
+                ->execute([$ticket['ref_id'], $ticket['ref_type'], $ticket['category'], $newProblem, $_SESSION['username']]);
         }
 
         $pdo->commit();

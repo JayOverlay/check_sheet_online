@@ -1,6 +1,7 @@
 <?php
 require_once '../config/database.php';
 include '../includes/header.php';
+include '../includes/admin_guard.php';
 
 // Pagination Setup
 $items_per_page = 15;
@@ -117,7 +118,14 @@ try {
                                     </span>
                                 </td>
                                 <td>
-                                    <?php echo $u['department'] ?: '---'; ?>
+                                    <?php
+                                    echo $u['department'] ?: '---';
+                                    if (!empty($u['responsible_family'])) {
+                                        echo '<br><small class="text-muted"><i class="fas fa-sitemap me-1"></i>';
+                                        echo htmlspecialchars($u['responsible_family']);
+                                        echo '</small>';
+                                    }
+                                    ?>
                                 </td>
                                 <td>
                                     <span
@@ -222,6 +230,38 @@ try {
                         <input type="text" class="form-control" name="department" id="department"
                             placeholder="Production / QA / Maintenance">
                     </div>
+                    <?php
+                    // Fetch available families for the checkbox list
+                    $families = [];
+                    try {
+                        $fStmt = $pdo->query("SELECT DISTINCT name FROM family_types ORDER BY name ASC");
+                        $families = $fStmt->fetchAll(PDO::FETCH_COLUMN);
+                    } catch (Exception $e) {
+                    }
+                    ?>
+                    <div class="mb-3" id="familyField" style="display: none;">
+                        <label class="form-label small fw-bold text-uppercase mb-2">Responsible Family (For Report
+                            Email)</label>
+                        <div class="card bg-light border-0">
+                            <div class="card-body p-3" style="max-height: 150px; overflow-y: auto;">
+                                <?php if (empty($families)): ?>
+                                    <div class="text-muted small">No families found in database.</div>
+                                <?php else: ?>
+                                    <?php foreach ($families as $f): ?>
+                                        <div class="form-check">
+                                            <input class="form-check-input family-checkbox" type="checkbox"
+                                                name="responsible_family[]" value="<?php echo htmlspecialchars($f); ?>"
+                                                id="fam_<?php echo htmlspecialchars($f); ?>">
+                                            <label class="form-check-label" for="fam_<?php echo htmlspecialchars($f); ?>">
+                                                <?php echo htmlspecialchars($f); ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="form-text text-muted small mt-2">Select families to receive reports about.</div>
+                    </div>
                 </div>
                 <div class="modal-footer border-0 p-4 pt-0">
                     <button type="button" class="btn btn-light rounded-pill px-4"
@@ -234,6 +274,18 @@ try {
 </div>
 
 <script>
+    function toggleFamilyField() {
+        const role = document.getElementById('role').value;
+        const familyField = document.getElementById('familyField');
+        if (role === 'leader' || role === 'Technicien' || role === 'admin') {
+            familyField.style.display = 'block';
+        } else {
+            familyField.style.display = 'none';
+        }
+    }
+
+    document.getElementById('role').addEventListener('change', toggleFamilyField);
+
     function editUser(u) {
         document.getElementById('modalTitle').innerText = 'Edit User';
         document.getElementById('user_id').value = u.id;
@@ -244,9 +296,23 @@ try {
         document.getElementById('status').value = u.status;
         document.getElementById('department').value = u.department;
 
-        // Hide password field when editing for simplicity, can implement change password later
-        document.getElementById('password').required = false;
-        document.getElementById('passwordField').style.opacity = '0.5';
+        // Reset check boxes
+        document.querySelectorAll('.family-checkbox').forEach(cb => cb.checked = false);
+
+        // Check the boxes user has
+        if (u.responsible_family) {
+            const fams = u.responsible_family.split(',').map(s => s.trim());
+            fams.forEach(f => {
+                // Find check box with this value
+                // Since value might have spaces and special chars, we use querySelector with attribute selector carefully or iterate
+                // Iterating is safer for special chars
+                document.querySelectorAll('.family-checkbox').forEach(cb => {
+                    if (cb.value === f) cb.checked = true;
+                });
+            });
+        }
+
+        toggleFamilyField(); // Show/Hide based on loaded role
 
         var modal = new bootstrap.Modal(document.getElementById('addUserModal'));
         modal.show();
@@ -262,8 +328,10 @@ try {
         document.getElementById('role').value = 'user';
         document.getElementById('status').value = 'Active';
         document.getElementById('department').value = '';
+        document.getElementById('responsible_family').value = '';
         document.getElementById('password').required = true;
         document.getElementById('passwordField').style.opacity = '1';
+        toggleFamilyField();
     });
 </script>
 

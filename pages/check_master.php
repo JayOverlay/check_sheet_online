@@ -4,7 +4,7 @@ require_once '../config/database.php';
 // Handle Add / Edit - MUST be before any HTML output (header.php)
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_item'])) {
     session_start();
-    if (!isset($_SESSION['user_id'])) {
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header("Location: " . BASE_URL . "login.php");
         exit();
     }
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['save_item'])) {
 // Handle Delete - MUST be before any HTML output
 if (isset($_GET['delete'])) {
     session_start();
-    if (!isset($_SESSION['user_id'])) {
+    if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
         header("Location: " . BASE_URL . "login.php");
         exit();
     }
@@ -54,6 +54,7 @@ if (isset($_GET['delete'])) {
 
 // Now include header (outputs HTML)
 include '../includes/header.php';
+include '../includes/admin_guard.php';
 
 // Get unique categories for filter
 $categories = $pdo->query("SELECT DISTINCT category FROM check_items ORDER BY category")->fetchAll(PDO::FETCH_COLUMN);
@@ -145,7 +146,7 @@ try {
             <table class="table table-custom">
                 <thead>
                     <tr>
-                        <th style="width: 100px; white-space: nowrap;">Code</th>
+                        <th class="col-code">Code</th>
                         <th style="max-width: 400px;">Description (EN/TH)</th>
                         <th style="width: 120px;">Category</th>
                         <th style="width: 100px;" class="text-center">Actions</th>

@@ -1,5 +1,11 @@
 <?php
 require_once '../config/database.php';
+session_start();
+
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: " . BASE_URL . "login.php");
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $machine_code = $_POST['machine_code'] ?? '';
@@ -38,11 +44,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $pdo->beginTransaction();
 
         if (empty($id)) {
+            // Check for duplicates before INSERT
+            $checkStmt = $pdo->prepare("SELECT id FROM machines WHERE machine_code = ? OR machine_name = ?");
+            $checkStmt->execute([$machine_code, $machine_name]);
+            if ($checkStmt->fetch()) {
+                throw new Exception("Duplicate Machine Code or Machine Name found.");
+            }
+
             // INSERT
             $stmt = $pdo->prepare("INSERT INTO machines (machine_code, serial_number, machine_name, image_path, product, family, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$machine_code, $serial_number, $machine_name, $image_path, $product, $family, $status]);
             $machine_id = $pdo->lastInsertId();
         } else {
+            // Check for duplicates before UPDATE (ignoring current ID)
+            $checkStmt = $pdo->prepare("SELECT id FROM machines WHERE (machine_code = ? OR machine_name = ?) AND id != ?");
+            $checkStmt->execute([$machine_code, $machine_name, $id]);
+            if ($checkStmt->fetch()) {
+                throw new Exception("Duplicate Machine Code or Machine Name found.");
+            }
+
             // UPDATE
             $machine_id = $id;
             $sql = "UPDATE machines SET machine_code=?, serial_number=?, machine_name=?, product=?, family=?, status=?";

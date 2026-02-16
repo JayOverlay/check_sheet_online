@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $target_str = $_POST['target_id'] ?? ''; // m_1 or t_5
     $category = $_POST['category'] ?? '';
     $problem = $_POST['problem'] ?? '';
-    $reported_by = $_SESSION['full_name']; // Store name for simple display
+    $reported_by = $_SESSION['username']; // Store Username (Employee ID) for precise tracking
 
     // Parse target
     $parts = explode('_', $target_str);

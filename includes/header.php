@@ -44,27 +44,32 @@ $_SESSION['last_activity'] = time();
             <a class="nav-link active" href="<?php echo BASE_URL; ?>index.php">
                 <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
             </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/machines.php">
-                <i class="fas fa-industry"></i> <span>Machines</span>
+            <a class="nav-link text-warning" href="<?php echo BASE_URL; ?>tv_dashboard.php" target="_blank">
+                <i class="fas fa-tv"></i> <span>TV Dashboard</span>
             </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/products.php">
-                <i class="fas fa-box"></i> <span>Products</span>
-            </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/families.php">
-                <i class="fas fa-tags"></i> <span>Family</span>
-            </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/tooling.php">
-                <i class="fas fa-tools"></i> <span>Tooling</span>
-            </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/check_master.php">
-                <i class="fas fa-clipboard-list"></i> <span>Check Items</span>
-            </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/parameters.php">
-                <i class="fas fa-sliders-h"></i> <span>Parameters</span>
-            </a>
-            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/inspections.php">
-                <i class="fas fa-microscope"></i> <span>Inspections</span>
-            </a>
+            <?php if ($_SESSION['role'] == 'admin'): ?>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/machines.php">
+                    <i class="fas fa-industry"></i> <span>Machines</span>
+                </a>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/products.php">
+                    <i class="fas fa-box"></i> <span>Products</span>
+                </a>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/families.php">
+                    <i class="fas fa-tags"></i> <span>Family</span>
+                </a>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/tooling.php">
+                    <i class="fas fa-tools"></i> <span>Tooling</span>
+                </a>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/check_master.php">
+                    <i class="fas fa-clipboard-list"></i> <span>Check Items</span>
+                </a>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/parameters.php">
+                    <i class="fas fa-sliders-h"></i> <span>Parameters</span>
+                </a>
+                <a class="nav-link" href="<?php echo BASE_URL; ?>pages/inspections.php">
+                    <i class="fas fa-microscope"></i> <span>Inspections</span>
+                </a>
+            <?php endif; ?>
             <a class="nav-link" href="<?php echo BASE_URL; ?>pages/check_form.php">
                 <i class="fas fa-clipboard-check"></i> <span>Fill Check Sheet</span>
             </a>
@@ -73,6 +78,9 @@ $_SESSION['last_activity'] = time();
             </a>
             <a class="nav-link" href="<?php echo BASE_URL; ?>pages/downtime.php">
                 <i class="fas fa-exclamation-triangle"></i> <span>Downtime / Repair</span>
+            </a>
+            <a class="nav-link" href="<?php echo BASE_URL; ?>pages/downtime_history.php">
+                <i class="fas fa-history"></i> <span>Downtime History</span>
             </a>
             <?php if ($_SESSION['role'] == 'admin'): ?>
                 <a class="nav-link" href="<?php echo BASE_URL; ?>pages/users.php">

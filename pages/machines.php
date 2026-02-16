@@ -1,6 +1,7 @@
 <?php
 require_once '../config/database.php';
 include '../includes/header.php';
+include '../includes/admin_guard.php';
 
 // Pagination Setup
 $items_per_page = 10;
@@ -8,39 +9,65 @@ $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
 if ($page < 1)
     $page = 1;
 $offset = ($page - 1) * $items_per_page;
+$total_items = $pdo->query("SELECT COUNT(*) FROM machines")->fetchColumn();
+$total_pages = ceil($total_items / $items_per_page);
 
-$machines = [];
-$total_items = 0;
-$productTypes = [];
-$familyTypes = [];
-$masterChecks = [];
+$stmt = $pdo->prepare("SELECT * FROM machines ORDER BY machine_code ASC LIMIT ? OFFSET ?");
+$stmt->bindValue(1, $items_per_page, PDO::PARAM_INT);
+$stmt->bindValue(2, $offset, PDO::PARAM_INT);
+$stmt->execute();
+$machines = $stmt->fetchAll();
 
-try {
-    // Get total count for pagination
-    $total_items = $pdo->query("SELECT COUNT(*) FROM machines")->fetchColumn();
-    $total_pages = ceil($total_items / $items_per_page);
+$productTypes = $pdo->query("SELECT name FROM product_types ORDER BY name ASC")->fetchAll();
+$familyTypes = $pdo->query("SELECT name FROM family_types ORDER BY name ASC")->fetchAll();
+$masterChecks = $pdo->query("SELECT * FROM check_items 
+    WHERE category IN ('Machine', 'Common', 'Customer', 'Parameter', 'Inspection', 'Safety')
+    ORDER BY 
+    category ASC,
+    CAST(SUBSTRING_INDEX(item_code, '.', 1) AS UNSIGNED) ASC, 
+    CAST(SUBSTRING_INDEX(item_code, '.', -1) AS UNSIGNED) ASC")->fetchAll();
+$masterParams = $pdo->query("SELECT * FROM parameters_master ORDER BY name_en ASC")->fetchAll();
+$masterInspections = $pdo->query("SELECT * FROM inspections_master ORDER BY name_en ASC")->fetchAll();
 
-    // Fetch machines with limit
-    $stmt = $pdo->prepare("SELECT * FROM machines ORDER BY machine_code ASC LIMIT ? OFFSET ?");
-    $stmt->bindValue(1, $items_per_page, PDO::PARAM_INT);
-    $stmt->bindValue(2, $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $machines = $stmt->fetchAll();
-
-    $productTypes = $pdo->query("SELECT name FROM product_types ORDER BY name ASC")->fetchAll();
-    $familyTypes = $pdo->query("SELECT name FROM family_types ORDER BY name ASC")->fetchAll();
-    $masterChecks = $pdo->query("SELECT * FROM check_items 
-        WHERE category IN ('Machine', 'Common', 'Customer', 'Parameter', 'Inspection', 'Safety')
-        ORDER BY 
-        category ASC,
-        CAST(SUBSTRING_INDEX(item_code, '.', 1) AS UNSIGNED) ASC, 
-        CAST(SUBSTRING_INDEX(item_code, '.', -1) AS UNSIGNED) ASC")->fetchAll();
-    $masterParams = $pdo->query("SELECT * FROM parameters_master ORDER BY name_en ASC")->fetchAll();
-    $masterInspections = $pdo->query("SELECT * FROM inspections_master ORDER BY name_en ASC")->fetchAll();
-} catch (Exception $e) {
-    // Table might not exist yet
+$groupedMasterChecks = [];
+foreach ($masterChecks as $check) {
+    $cat = $check['category'] ?: 'Other';
+    $groupedMasterChecks[$cat][] = $check;
 }
 ?>
+
+<style>
+    .accordion-button:not(.collapsed) {
+        background-color: rgba(13, 110, 253, 0.05);
+        color: #0d6efd;
+    }
+
+    .check-item-row:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .check-items-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .check-items-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .check-items-container::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 10px;
+    }
+
+    .check-items-container::-webkit-scrollbar-thumb:hover {
+        background: #aaa;
+    }
+
+    .frequency-select:disabled {
+        background-color: #f8f9fa !important;
+        cursor: not-allowed;
+    }
+</style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold mb-0">Machine Inventory</h4>
@@ -56,7 +83,7 @@ try {
                 <thead>
                     <tr>
                         <th>Image</th>
-                        <th>Machine Code</th>
+                        <th class="col-code">Machine Code</th>
                         <th>Name</th>
                         <th>Serial Number</th>
                         <th>Product</th>
@@ -256,53 +283,102 @@ try {
                                 onclick="addAllMasterItems()">Add All Items</button>
                         </label>
 
-                        <!-- Search & Add Dropdown -->
-                        <div class="input-group mb-2">
-                            <span class="input-group-text bg-light text-muted"><i
-                                    class="fas fa-search small"></i></span>
-                            <select class="form-select form-select-sm" id="checkItemSearch"
-                                onchange="addCheckItemFromSelect()">
-                                <option value="">-- Search & Add Check Item --</option>
-                                <?php
-                                $currentCat = '';
-                                foreach ($masterChecks as $check):
-                                    if ($currentCat != $check['category']) {
-                                        $currentCat = $check['category'];
-                                        echo '<optgroup label="' . (($currentCat == 'Common') ? 'General / Common' : $currentCat) . '">';
-                                    }
-                                    ?>
-                                    <option value="<?php echo $check['id']; ?>"
-                                        data-code="<?php echo $check['item_code']; ?>"
-                                        data-en="<?php echo $check['name_en']; ?>"
-                                        data-th="<?php echo $check['name_th']; ?>">
-                                        <?php echo $check['item_code']; ?>: <?php echo $check['name_en']; ?>
-                                    </option>
-                                    <?php
-                                    if (!isset($masterChecks[array_search($check, $masterChecks) + 1]) || $masterChecks[array_search($check, $masterChecks) + 1]['category'] != $currentCat) {
-                                        echo '</optgroup>';
-                                    }
-                                endforeach; ?>
-                            </select>
+                        <div class="mb-2 d-flex justify-content-between align-items-center">
+                            <label class="form-label small fw-bold text-uppercase mb-0">Check Items Selection</label>
+                            <div class="input-group input-group-sm w-auto">
+                                <span class="input-group-text bg-white border-0 small text-muted"><i
+                                        class="fas fa-search"></i></span>
+                                <input type="text" class="form-control form-control-sm border-0 bg-light"
+                                    id="checkItemFilter" placeholder="Filter items..." onkeyup="filterCheckItems()">
+                            </div>
                         </div>
 
-                        <!-- Selected Items List -->
-                        <div class="border rounded p-2" style="max-height: 300px; overflow-y: auto; background: #fff;">
-                            <table class="table table-sm table-hover mb-0" id="selectedChecksTable">
-                                <thead class="small text-muted bg-light">
-                                    <tr>
-                                        <th>Code</th>
-                                        <th>Check Item</th>
-                                        <th style="width: 120px;">Frequency</th>
-                                        <th style="width: 40px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="selectedChecksBody">
-                                    <tr id="noItemsNote">
-                                        <td colspan="4" class="text-center py-3 text-muted small">No items selected. Add
-                                            from dropdown above.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="accordion accordion-flush border rounded-3 overflow-hidden mb-3"
+                            id="checksAccordion">
+                            <?php
+                            $catIdx = 0;
+                            foreach ($groupedMasterChecks as $category => $items):
+                                $catIdx++;
+                                $safeCatId = 'cat_' . preg_replace('/[^a-zA-Z0-9]/', '', $category);
+                                ?>
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed py-2 px-3 bg-light bg-opacity-50"
+                                            type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#<?php echo $safeCatId; ?>">
+                                            <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                                <span class="fw-bold small text-primary"><i
+                                                        class="fas fa-folder me-2"></i><?php echo $category; ?></span>
+                                                <span class="badge bg-secondary rounded-pill"
+                                                    style="font-size: 0.6rem;"><?php echo count($items); ?> items</span>
+                                            </div>
+                                        </button>
+                                    </h2>
+                                    <div id="<?php echo $safeCatId; ?>" class="accordion-collapse collapse"
+                                        data-bs-parent="#checksAccordion">
+                                        <div class="accordion-body p-0">
+                                            <div
+                                                class="bg-white px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox"
+                                                        id="selectAll_<?php echo $safeCatId; ?>"
+                                                        onchange="toggleCategoryAll('<?php echo $safeCatId; ?>', this.checked)">
+                                                    <label class="form-check-label small text-muted"
+                                                        for="selectAll_<?php echo $safeCatId; ?>">Select All</label>
+                                                </div>
+                                                <div class="small text-muted" style="font-size: 0.7rem;">Default: Daily
+                                                </div>
+                                            </div>
+                                            <div class="p-0 check-items-container"
+                                                style="max-height: 250px; overflow-y: auto;">
+                                                <table class="table table-sm table-hover mb-0 align-middle">
+                                                    <tbody class="category-items"
+                                                        data-category-id="<?php echo $safeCatId; ?>">
+                                                        <?php foreach ($items as $i): ?>
+                                                            <tr class="check-item-row">
+                                                                <td style="width: 40px;" class="ps-3">
+                                                                    <input class="form-check-input item-checkbox"
+                                                                        type="checkbox" name="check_items[]"
+                                                                        value="<?php echo $i['id']; ?>"
+                                                                        id="chk_<?php echo $i['id']; ?>"
+                                                                        onchange="toggleFrequency('<?php echo $i['id']; ?>', this.checked)">
+                                                                </td>
+                                                                <td>
+                                                                    <label class="d-block py-1"
+                                                                        for="chk_<?php echo $i['id']; ?>"
+                                                                        style="cursor: pointer;">
+                                                                        <div class="fw-bold small text-dark mb-0">
+                                                                            <?php echo $i['item_code']; ?>:
+                                                                            <?php echo $i['name_en']; ?>
+                                                                        </div>
+                                                                        <div class="text-muted" style="font-size: 0.65rem;">
+                                                                            <?php echo $i['name_th']; ?>
+                                                                        </div>
+                                                                    </label>
+                                                                </td>
+                                                                <td style="width: 130px;" class="pe-3">
+                                                                    <select
+                                                                        class="form-select form-select-sm border-0 bg-light opacity-50 frequency-select"
+                                                                        name="frequency[<?php echo $i['id']; ?>]"
+                                                                        id="freq_<?php echo $i['id']; ?>" disabled>
+                                                                        <option value="shift">Shift</option>
+                                                                        <option value="daily" selected>Daily</option>
+                                                                        <option value="weekly">Weekly</option>
+                                                                        <option value="monthly">Monthly</option>
+                                                                        <option value="3_months">3 Months</option>
+                                                                        <option value="6_months">6 Months</option>
+                                                                        <option value="yearly">Yearly</option>
+                                                                    </select>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
 
@@ -448,7 +524,7 @@ try {
                         <table class="table table-sm align-middle">
                             <thead class="small text-muted text-uppercase">
                                 <tr>
-                                    <th class="ps-3">Code</th>
+                                    <th class="ps-3 col-code">Code</th>
                                     <th>Item Name</th>
                                     <th>Freq</th>
                                 </tr>
@@ -548,6 +624,55 @@ try {
         viewSpecModal = new bootstrap.Modal(document.getElementById('viewMachineModal'));
         qrModal = new bootstrap.Modal(document.getElementById('qrModal'));
         imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+
+        // Handle Form Submission with Duplicate Check
+        document.getElementById('machineForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const form = this;
+            const formData = new FormData(form);
+
+            // First, check for duplicates
+            fetch('<?php echo BASE_URL; ?>actions/check_duplicate_machine.php', {
+                method: 'POST',
+                body: formData
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.exists) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'ข้อมูลซ้ำ!',
+                            text: `มีชื่อหรือรหัสเครื่องนี้อยู่ในระบบแล้ว (${data.duplicate_field})`,
+                            confirmButtonColor: '#0d6efd',
+                            confirmButtonText: 'ตกลง'
+                        });
+                    } else {
+                        form.submit();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    form.submit(); // Fallback to normal submission if error
+                });
+        });
+
+        // Show Success Toast if redirect from save
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('success')) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true
+            });
+            Toast.fire({
+                icon: 'success',
+                title: 'บันทึกข้อมูลเครื่องจักรเรียบร้อยแล้ว'
+            });
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
     });
 
     function viewImage(url, title) {
@@ -640,7 +765,7 @@ try {
         <div class="small fw-bold">${i.name_en}</div>
         <div class="text-muted" style="font-size:0.7rem">${i.name_th}</div>
     </td>
-    <td><span class="badge bg-light text-dark border">${i.frequency}</span></td>
+    <td><span class="badge bg-light text-dark border">${(i.frequency || 'daily').replace('_', ' ')}</span></td>
 </tr>`;
                 });
                 if (!data.checkItems.length) cb.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted small">No items mapped.</td></tr>';
@@ -675,21 +800,74 @@ try {
             });
     }
 
+    function toggleFrequency(id, checked) {
+        const freqSelect = document.getElementById('freq_' + id);
+        if (freqSelect) {
+            freqSelect.disabled = !checked;
+            if (checked) {
+                freqSelect.classList.remove('opacity-50');
+            } else {
+                freqSelect.classList.add('opacity-50');
+            }
+        }
+    }
+
+    function toggleCategoryAll(catId, checked) {
+        const container = document.getElementById(catId);
+        if (!container) return;
+        const checkboxes = container.querySelectorAll('.item-checkbox');
+        checkboxes.forEach(chk => {
+            chk.checked = checked;
+            toggleFrequency(chk.value, checked);
+        });
+    }
+
+    function filterCheckItems() {
+        const query = document.getElementById('checkItemFilter').value.toLowerCase();
+        const rows = document.querySelectorAll('.check-item-row');
+
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            if (text.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Also expand accordions that have visible items
+        const accordionItems = document.querySelectorAll('.accordion-item');
+        accordionItems.forEach(ai => {
+            const visibleItems = Array.from(ai.querySelectorAll('.check-item-row')).filter(r => r.style.display !== 'none').length;
+
+            if (query && visibleItems > 0) {
+                const btn = ai.querySelector('.accordion-button');
+                if (btn.classList.contains('collapsed')) {
+                    btn.click();
+                }
+            }
+        });
+    }
+
     function openAddModal() {
         document.getElementById('machineForm').reset();
         document.getElementById('machine_id').value = '';
         document.getElementById('modalTitle').textContent = 'Register New Machine';
 
-        // Clear tables
-        document.getElementById('selectedChecksBody').innerHTML = `<tr id="noItemsNote">
-    <td colspan="4" class="text-center py-3 text-muted small">No items selected. Add from dropdown above.</td>
-</tr>`;
+        // Reset check items checkboxes
+        document.querySelectorAll('.item-checkbox').forEach(chk => {
+            chk.checked = false;
+            toggleFrequency(chk.value, false);
+        });
+        document.querySelectorAll('[id^="selectAll_"]').forEach(chk => chk.checked = false);
+
+        // Clear tables for params/insps
         document.getElementById('selectedParamsBody').innerHTML = `<tr id="noParamsNote">
-    <td colspan="5" class="text-center py-2 text-muted small">Optional: No parameters selected.</td>
-</tr>`;
+            <td colspan="5" class="text-center py-2 text-muted small">Optional: No parameters selected.</td>
+        </tr>`;
         document.getElementById('selectedInspectionsBody').innerHTML = `<tr id="noInsNote">
-    <td colspan="5" class="text-center py-2 text-muted small">Optional: No inspections selected.</td>
-</tr>`;
+            <td colspan="5" class="text-center py-2 text-muted small">Optional: No inspections selected.</td>
+        </tr>`;
 
         addModal.show();
     }
@@ -699,27 +877,22 @@ try {
         document.getElementById('machine_id').value = id;
         document.getElementById('modalTitle').textContent = 'Edit Machine';
 
-        // Clear tables first
-        document.getElementById('selectedChecksBody').innerHTML = '';
+        // Reset check items checkboxes
+        document.querySelectorAll('.item-checkbox').forEach(chk => {
+            chk.checked = false;
+            toggleFrequency(chk.value, false);
+        });
+        document.querySelectorAll('[id^="selectAll_"]').forEach(chk => chk.checked = false);
+
+        // Clear tables for params/insps
         document.getElementById('selectedParamsBody').innerHTML = '';
         document.getElementById('selectedInspectionsBody').innerHTML = '';
 
         // Fetch Data
         fetch('<?php echo BASE_URL; ?>actions/get_machine_details.php?id=' + id)
-            .then(response => response.text())
-            .then(text => {
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error("Edit Machine Error:", text);
-                    throw new Error("Server returned: " + text.substring(0, 100));
-                }
-            })
+            .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
+                if (data.error) { alert('Error: ' + data.error); return; }
 
                 // Set Basic Info
                 const m = data.machine;
@@ -730,15 +903,17 @@ try {
                 document.getElementById('family').value = m.family;
                 document.getElementById('status').value = m.status;
 
-                // Set Check Items
+                // Set Check Items Selection
                 if (data.checkItems && data.checkItems.length > 0) {
                     data.checkItems.forEach(item => {
-                        addCheckItemRow(item.check_item_id, item.item_code, item.name_en, item.name_th, item.frequency || 'daily');
+                        const chk = document.getElementById('chk_' + item.check_item_id);
+                        const freq = document.getElementById('freq_' + item.check_item_id);
+                        if (chk) {
+                            chk.checked = true;
+                            toggleFrequency(item.check_item_id, true);
+                        }
+                        if (freq) freq.value = item.frequency || 'daily';
                     });
-                } else {
-                    document.getElementById('selectedChecksBody').innerHTML = `<tr id="noItemsNote">
-    <td colspan="4" class="text-center py-3 text-muted small">No items selected. Add from dropdown above.</td>
-</tr>`;
                 }
 
                 // Set Parameters
@@ -747,9 +922,7 @@ try {
                         addParameterRow(p.parameter_id, p.name_en, p.unit, p.target_value, p.plus_tolerance, p.minus_tolerance);
                     });
                 } else {
-                    document.getElementById('selectedParamsBody').innerHTML = `<tr id="noParamsNote">
-    <td colspan="5" class="text-center py-2 text-muted small">Optional: No parameters selected.</td>
-</tr>`;
+                    checkEmptyParam();
                 }
 
                 // Set Inspections
@@ -758,9 +931,7 @@ try {
                         addInspectionRow(i.inspection_id, i.name_en, i.unit, i.target_value, i.plus_tolerance, i.minus_tolerance);
                     });
                 } else {
-                    document.getElementById('selectedInspectionsBody').innerHTML = `<tr id="noInsNote">
-    <td colspan="5" class="text-center py-2 text-muted small">Optional: No inspections selected.</td>
-</tr>`;
+                    checkEmptyIns();
                 }
 
                 addModal.show();
@@ -771,69 +942,12 @@ try {
             });
     }
 
-    function addCheckItemFromSelect() {
-        const select = document.getElementById('checkItemSearch');
-        const id = select.value;
-        if (!id) return;
-
-        const option = select.options[select.selectedIndex];
-        addCheckItemRow(id, option.dataset.code, option.dataset.en, option.dataset.th);
-
-        select.value = ""; // Reset dropdown
-    }
-
-    function addCheckItemRow(id, code, en, th, frequency = 'daily') {
-        // Check if already exists
-        if (document.getElementById('row_check_' + id)) return;
-
-        const note = document.getElementById('noItemsNote');
-        if (note) note.remove();
-
-        const tbody = document.getElementById('selectedChecksBody');
-        const row = document.createElement('tr');
-        row.id = 'row_check_' + id;
-        row.className = 'align-middle';
-        row.innerHTML = `
-<td class="small fw-bold text-primary">${code}</td>
-<td class="small">
-    <div>${en}</div>
-    <div class="text-muted" style="font-size: 0.7rem;">${th}</div>
-    <input type="hidden" name="check_items[]" value="${id}">
-</td>
-<td>
-    <select class="form-select form-select-sm" name="frequency[${id}]">
-        <option value="shift" ${frequency === 'shift' ? 'selected' : ''}>Shift</option>
-        <option value="daily" ${frequency === 'daily' ? 'selected' : ''}>Daily</option>
-        <option value="weekly" ${frequency === 'weekly' ? 'selected' : ''}>Weekly</option>
-        <option value="monthly" ${frequency === 'monthly' ? 'selected' : ''}>Monthly</option>
-        <option value="quarterly" ${frequency === 'quarterly' ? 'selected' : ''}>Quarterly</option>
-        <option value="6_months" ${frequency === '6_months' ? 'selected' : ''}>6 Months</option>
-        <option value="yearly" ${frequency === 'yearly' ? 'selected' : ''}>Yearly</option>
-    </select>
-</td>
-<td>
-    <button type="button" class="btn btn-sm text-danger" onclick="removeCheckItem(${id})">
-        <i class="fas fa-times"></i>
-    </button>
-</td>
-`;
-        tbody.appendChild(row);
-    }
-
-    function removeCheckItem(id) {
-        document.getElementById('row_check_' + id).remove();
-        if (document.getElementById('selectedChecksBody').children.length === 0) {
-            const tbody = document.getElementById('selectedChecksBody');
-            tbody.innerHTML = `<tr id="noItemsNote">
-    <td colspan="4" class="text-center py-3 text-muted small">No items selected. Add from dropdown above.</td>
-</tr>`;
-        }
-    }
-
     function addAllMasterItems() {
-        masterItems.forEach(item => {
-            addCheckItemRow(item.id, item.item_code, item.name_en, item.name_th);
+        document.querySelectorAll('.item-checkbox').forEach(chk => {
+            chk.checked = true;
+            toggleFrequency(chk.value, true);
         });
+        document.querySelectorAll('[id^="selectAll_"]').forEach(chk => chk.checked = true);
     }
 
     // New Parameter logic

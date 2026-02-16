@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200">
+  <rect fill="#f1f5f9" width="400" height="200"/>
+  <text x="200" y="95" font-family="Arial, sans-serif" font-size="16" fill="#64748b" text-anchor="middle">No Image</text>
+  <text x="200" y="120" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">Machine photo not available</text>
+</svg>

@@ -1,0 +1,15 @@
+@font-face {
+    font-family: 'Prompt';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(../fonts/-W__XJnvUD7dzB26Zw.ttf) format('truetype');
+}
+
+@font-face {
+    font-family: 'Prompt';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(../fonts/-W_8XJnvUD7dzB2Cv_44bg.ttf) format('truetype');
+}

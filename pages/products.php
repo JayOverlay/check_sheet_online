@@ -1,6 +1,7 @@
 <?php
 require_once '../config/database.php';
 include '../includes/header.php';
+include '../includes/admin_guard.php';
 
 // Handle addition of new product type
 if (isset($_POST['add_product'])) {

@@ -15,26 +15,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $role = $_POST['role'];
     $status = $_POST['status'];
     $department = $_POST['department'];
+    $responsible_family = $_POST['responsible_family'] ?? null;
+    if (is_array($responsible_family)) {
+        $responsible_family = implode(', ', $responsible_family);
+    }
 
     try {
         if (!empty($id)) {
             // Update existing user
             if (!empty($password)) {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $sql = "UPDATE users SET username = ?, password = ?, full_name = ?, email = ?, role = ?, status = ?, department = ? WHERE id = ?";
+                $sql = "UPDATE users SET username = ?, password = ?, full_name = ?, email = ?, role = ?, status = ?, department = ?, responsible_family = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$username, $hashed_password, $full_name, $email, $role, $status, $department, $id]);
+                $stmt->execute([$username, $hashed_password, $full_name, $email, $role, $status, $department, $responsible_family, $id]);
             } else {
-                $sql = "UPDATE users SET username = ?, full_name = ?, email = ?, role = ?, status = ?, department = ? WHERE id = ?";
+                $sql = "UPDATE users SET username = ?, full_name = ?, email = ?, role = ?, status = ?, department = ?, responsible_family = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$username, $full_name, $email, $role, $status, $department, $id]);
+                $stmt->execute([$username, $full_name, $email, $role, $status, $department, $responsible_family, $id]);
             }
         } else {
             // Insert new user
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $sql = "INSERT INTO users (username, password, full_name, email, role, status, department) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO users (username, password, full_name, email, role, status, department, responsible_family) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$username, $hashed_password, $full_name, $email, $role, $status, $department]);
+            $stmt->execute([$username, $hashed_password, $full_name, $email, $role, $status, $department, $responsible_family]);
         }
 
         header("Location: " . BASE_URL . "pages/users.php?success=1");

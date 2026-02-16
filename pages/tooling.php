@@ -1,6 +1,7 @@
 <?php
 require_once '../config/database.php';
 include '../includes/header.php';
+include '../includes/admin_guard.php';
 
 // Pagination Setup
 $items_per_page = 10;
@@ -53,7 +54,7 @@ try {
                 <thead>
                     <tr>
                         <th>Image</th>
-                        <th>Tool Code</th>
+                        <th class="col-code">Tool Code</th>
                         <th>Name</th>
                         <th>Serial Number</th>
                         <th>Product</th>
@@ -157,7 +158,7 @@ try {
 <div class="modal fade" id="addToolModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="save_tooling" method="POST" enctype="multipart/form-data">
+            <form action="<?php echo BASE_URL; ?>actions/save_tooling.php" method="POST" enctype="multipart/form-data">
                 <div class="modal-header border-0 p-4 pb-0">
                     <h5 class="fw-bold mb-0">Register New Tool</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

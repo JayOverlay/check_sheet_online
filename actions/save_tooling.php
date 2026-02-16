@@ -1,5 +1,11 @@
 <?php
 require_once '../config/database.php';
+session_start();
+
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: " . BASE_URL . "login.php");
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $tool_code = $_POST['tool_code'] ?? '';

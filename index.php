@@ -101,7 +101,7 @@ try {
                         <thead>
                             <tr>
                                 <th>Date & Time</th>
-                                <th>Target</th>
+                                <th class="col-code">Target</th>
                                 <th>Type</th>
                                 <th>Inspector</th>
                                 <th>Status</th>
@@ -220,7 +220,7 @@ try {
                         <table class="table align-middle mb-0">
                             <thead class="bg-light text-secondary small text-uppercase">
                                 <tr>
-                                    <th class="ps-4">Code</th>
+                                    <th class="ps-4 col-code">Code</th>
                                     <th>Check Item</th>
                                     <th class="text-center">Result</th>
                                     <th>Comment</th>
@@ -259,7 +259,7 @@ try {
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light text-secondary small text-uppercase">
                             <tr>
-                                <th class="ps-4">Code</th>
+                                <th class="ps-4 col-code">Code</th>
                                 <th>Machine Name</th>
                                 <th>PF / Family</th>
                                 <th class="text-end pe-4">Action</th>

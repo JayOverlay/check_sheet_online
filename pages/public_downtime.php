@@ -4,6 +4,9 @@ require_once '../config/database.php';
 $machineId = $_GET['machine_id'] ?? '';
 $machineInfo = null;
 $errorMsg = $_GET['error'] ?? '';
+$autoProblem = $_GET['auto_problem'] ?? '';
+$fromCheck = $_GET['from_check'] ?? '';
+$employeeId = $_GET['employee_id'] ?? '';
 
 if ($machineId) {
     try {
@@ -24,12 +27,35 @@ if ($machineId) {
     <title>Report Repair - Hana Check Sheet</title>
     <link href="<?php echo BASE_URL; ?>assets/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>assets/libs/fontawesome/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>assets/css/inter.css" rel="stylesheet">
+    <script src="<?php echo BASE_URL; ?>assets/js/sweetalert2.all.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
             min-height: 100vh;
+        }
+
+        .from-check-banner {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            text-align: center;
+            animation: pulse-border 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-border {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
         }
     </style>
 </head>
@@ -41,6 +67,16 @@ if ($machineId) {
             <div class="col-lg-6 col-xl-5">
 
                 <?php if ($machineInfo): ?>
+
+                    <?php if ($fromCheck): ?>
+                        <div class="from-check-banner">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                            <h5 class="fw-bold mb-1">พบรายการ NG!</h5>
+                            <p class="small mb-0 opacity-75">ระบบตรวจพบปัญหาจากการเช็คเครื่อง กรุณากรอกรายละเอียดแล้วส่งแจ้งซ่อม
+                            </p>
+                        </div>
+                    <?php endif; ?>
+
                     <form action="../actions/public_save_downtime.php" method="POST">
                         <input type="hidden" name="target_id" value="m_<?php echo $machineId; ?>">
 
@@ -67,32 +103,38 @@ if ($machineId) {
                         <div class="card border-0 shadow-sm rounded-4">
                             <div class="card-body p-4">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small text-uppercase">Reported By (ชื่อผู้แจ้ง)</label>
+                                    <label class="form-label fw-bold small text-uppercase">Reported By (รหัสพนักงาน /
+                                        Employee ID)</label>
                                     <input type="text" class="form-control form-control-lg bg-light border-0"
-                                        name="reported_by" placeholder="Enter your name / ID" required>
+                                        name="reported_by" placeholder="กรอกรหัสพนักงานของคุณ" required
+                                        value="<?php echo htmlspecialchars($employeeId); ?>">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label fw-bold small text-uppercase">Category (หมวดหมู่)</label>
                                     <select class="form-select form-select-lg bg-light border-0" name="category" required>
-                                        <option value="Mechanical">Mechanical</option>
-                                        <option value="Electrical">Electrical</option>
-                                        <option value="Software">Software</option>
-                                        <option value="Process">Process</option>
-                                        <option value="Other">Other</option>
+                                        <option value="SET_UP">SET_UP</option>
+                                        <option value="DOWN" selected>DOWN</option>
+                                        <option value="PM">PM</option>
+                                        <option value="PD_IDEL">PD_IDEL</option>
+                                        <option value="ENG">ENG</option>
+                                        <option value="CUSTOMER_DOWN">CUSTOMER_DOWN</option>
                                     </select>
                                 </div>
                                 <div class="mb-4">
                                     <label class="form-label fw-bold small text-uppercase">Problem Description
                                         (รายละเอียดปัญหา)</label>
                                     <textarea class="form-control form-control-lg bg-light border-0" name="problem" rows="4"
-                                        placeholder="Describe what happened..." required></textarea>
+                                        placeholder="Describe what happened..."
+                                        required><?php echo htmlspecialchars($autoProblem); ?></textarea>
                                 </div>
 
                                 <div class="d-grid gap-2">
                                     <button type="submit"
                                         class="btn btn-danger btn-lg rounded-pill shadow-sm fw-bold">Submit Report</button>
-                                    <a href="scan.php?machine_id=<?php echo $machineId; ?>"
-                                        class="btn btn-light btn-lg rounded-pill text-muted">Cancel</a>
+                                    <?php if (!$fromCheck): ?>
+                                        <a href="scan.php?machine_id=<?php echo $machineId; ?>"
+                                            class="btn btn-light btn-lg rounded-pill text-muted">Cancel</a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -115,6 +157,21 @@ if ($machineId) {
     </div>
 
     <script src="<?php echo BASE_URL; ?>assets/libs/bootstrap/bootstrap.bundle.min.js"></script>
+
+    <?php if ($fromCheck): ?>
+        <script>
+            window.addEventListener('load', function () {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'พบรายการ NG!',
+                    html: '<p>ระบบตรวจพบปัญหาจากการเช็คเครื่อง</p><p class="fw-bold text-danger">กรุณากรอกรายละเอียดและกดส่งแจ้งซ่อม</p>',
+                    confirmButtonText: 'เข้าใจแล้ว',
+                    confirmButtonColor: '#ef4444',
+                    allowOutsideClick: false
+                });
+            });
+        </script>
+    <?php endif; ?>
 </body>
 
 </html>

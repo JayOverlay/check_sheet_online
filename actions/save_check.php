@@ -41,11 +41,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Check database
-    $dupStmt = $pdo->prepare("SELECT COUNT(*) FROM check_sheets WHERE target_id = ? AND created_at BETWEEN ? AND ?");
-    $dupStmt->execute([$target_id, $shiftStart, $shiftEnd]);
+    // Receive check_type
+    $check_type = $_POST['check_type'] ?? 'Daily';
+
+    // Check database (Specific to Shift AND Check Type)
+    $dupSql = "SELECT COUNT(*) FROM check_sheets WHERE target_id = ? AND check_type = ? AND created_at BETWEEN ? AND ?";
+    $dupStmt = $pdo->prepare($dupSql);
+    $dupStmt->execute([$target_id, $check_type, $shiftStart, $shiftEnd]);
     if ($dupStmt->fetchColumn() > 0) {
-        $msg = urlencode("เครื่องจักรนี้ถูกลงข้อมูลสำหรับ $shiftLabel เรียบร้อยแล้ว ไม่สามารถลงซ้ำได้");
+        $typeLabel = $check_type ? "หัวข้อ $check_type" : "ข้อมูล";
+        $msg = urlencode("เครื่องจักรนี้ถูกลงบันทึกใน $typeLabel สำหรับ $shiftLabel เรียบร้อยแล้ว");
         header("Location: " . BASE_URL . "pages/check_form.php?machine_id=$machine_id&employee_id=$employee_id&error=$msg");
         exit();
     }
@@ -59,8 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($status === 'NG') {
             $has_problem = true;
             $notes = $comments[$item_id] ?? '';
-            // Fetch item name for better reporting (optional, skipping for speed)
-            $problems_found[] = "Item #$item_id: $notes";
+            $problems_found[] = "Item #$item_id ($check_type): $notes";
         }
     }
 
@@ -70,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $pdo->beginTransaction();
 
         // 3. Insert into check_sheets
-        $stmt = $pdo->prepare("INSERT INTO check_sheets (target_id, inspector_name, overall_status, remarks, check_type, created_at) VALUES (?, ?, ?, ?, 'Daily', NOW())");
-        $stmt->execute([$target_id, $employee_id, $overall_status, $overall]);
+        $stmt = $pdo->prepare("INSERT INTO check_sheets (target_id, inspector_name, overall_status, remarks, check_type, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$target_id, $employee_id, $overall_status, $overall, $check_type]);
         $check_sheet_id = $pdo->lastInsertId();
 
         // 4. Insert into check_sheet_details
@@ -82,30 +86,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $detailStmt->execute([$check_sheet_id, $item_id, $status, $comment]);
         }
 
-        // 5. Handle Downtime Logic if NG
+        $pdo->commit();
+
+        // 5. If NG found → Redirect to Downtime page to report issue
         if ($has_problem) {
+            // Build problem description from NG items for pre-fill
             $problem_desc = implode(" | ", $problems_found);
             if (!empty($overall)) {
                 $problem_desc .= " [Overall: $overall]";
             }
 
-            // Insert Downtime Ticket
-            $dtStmt = $pdo->prepare("INSERT INTO downtime (ref_id, ref_type, problem, reported_by, status, created_at) VALUES (?, 'machine', ?, ?, 'Pending', NOW())");
-            $dtStmt->execute([$machine_id, $problem_desc, $employee_id]);
-
-            // Update Machine Status
-            $updStmt = $pdo->prepare("UPDATE machines SET status = 'Maintenance' WHERE id = ?");
-            $updStmt->execute([$machine_id]);
+            // Redirect to downtime page with report modal auto-open
+            $redirect_params = http_build_query([
+                'report' => 1,
+                'machine_id' => $machine_id,
+                'auto_problem' => $problem_desc,
+                'from_check' => 1
+            ]);
+            header("Location: " . BASE_URL . "pages/downtime.php?" . $redirect_params);
         } else {
-            // Update Last Check Date (Optional)
-            // $pdo->prepare("UPDATE machines SET last_check = NOW() WHERE id = ?")->execute([$machine_id]);
+            // 6. Redirect to Success Page (all OK)
+            header("Location: " . BASE_URL . "pages/machines.php?success=check_completed");
         }
-
-        $pdo->commit();
-
-        // 6. Redirect to Success Page
-        // Redirect back to machines page since check_history might not exist yet
-        header("Location: " . BASE_URL . "pages/machines.php?success=check_completed");
         exit();
 
     } catch (Exception $e) {

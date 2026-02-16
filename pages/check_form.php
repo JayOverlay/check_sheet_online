@@ -9,6 +9,7 @@ $machines = $pdo->query("SELECT * FROM machines WHERE status = 'Active'")->fetch
 $formLoaded = isset($_GET['machine_id']) && isset($_GET['employee_id']);
 $machineId = $_GET['machine_id'] ?? '';
 $employeeId = $_GET['employee_id'] ?? '';
+$type = $_GET['type'] ?? '';
 $machineInfo = null;
 $checkItems = [];
 
@@ -22,6 +23,20 @@ if ($machineId) {
         $isInactive = true;
     }
 }
+
+// Validate Employee ID if provided
+$userError = '';
+if ($formLoaded && $employeeId) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ? AND status = 'Active'");
+    $stmt->execute([$employeeId]);
+    if ($stmt->fetchColumn() == 0) {
+        $formLoaded = false; // Prevent loading the form
+        $userError = "รหัสพนักงานนี้ ($employeeId) ไม่มีในระบบ หรือสถานะไม่ Active";
+        // Do not clear $employeeId so the user can see what they typed, or you can clear it.
+        // Let's keep it but maybe it's better to clear it from the form loaded state logic
+    }
+}
+
 
 // DEBUG RAW
 /*
@@ -39,22 +54,41 @@ if ($formLoaded && $machineId) {
     $machineInfo = $stmt->fetch();
 
     // Get check items assigned to this machine
-    $stmt = $pdo->prepare("
-        SELECT ci.* 
-        FROM check_items ci 
-        INNER JOIN machine_check_items mci ON ci.id = mci.check_item_id 
-        WHERE mci.machine_id = ?
-        ORDER BY ci.category, ci.item_code ASC
-    ");
-    $stmt->execute([$machineId]);
+    // $type defined at top level now
+    if ($type) {
+        $stmt = $pdo->prepare("
+            SELECT ci.*, mci.frequency 
+            FROM check_items ci 
+            INNER JOIN machine_check_items mci ON ci.id = mci.check_item_id 
+            WHERE mci.machine_id = ? AND ci.category = ?
+            ORDER BY ci.item_code ASC
+        ");
+        $stmt->execute([$machineId, $type]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT ci.*, mci.frequency 
+            FROM check_items ci 
+            INNER JOIN machine_check_items mci ON ci.id = mci.check_item_id 
+            WHERE mci.machine_id = ?
+            ORDER BY ci.category, ci.item_code ASC
+        ");
+        $stmt->execute([$machineId]);
+    }
     $checkItems = $stmt->fetchAll();
 
     // FALLBACK: If no specific items mapped, fetch ALL active items
     $isDefaultList = false;
     if (empty($checkItems)) {
-        $stmt = $pdo->query("SELECT * FROM check_items ORDER BY category, item_code ASC");
+        $stmt = $pdo->query("SELECT *, 'daily' as frequency FROM check_items ORDER BY category, item_code ASC");
         $checkItems = $stmt->fetchAll();
         $isDefaultList = true;
+    }
+
+    // Collect available frequencies for this machine
+    $availableFreqs = [];
+    foreach ($checkItems as $ci) {
+        $f = $ci['frequency'] ?: 'daily';
+        $availableFreqs[$f] = true;
     }
 
     // Dynamic Grouping
@@ -66,12 +100,16 @@ if ($formLoaded && $machineId) {
     ];
 
     foreach ($checkItems as $item) {
-        $cat = $item['category'] ?? 'Other';
-        if (trim($cat) === '')
-            $cat = 'Other'; // Handle empty string
+        $catRaw = trim($item['category'] ?? 'Other');
+        if ($catRaw === '')
+            $catRaw = 'Other';
 
-        // Capitalize first letter just in case
-        $cat = ucfirst($cat);
+        // STRICT FILTER: If a type is requested, only group items for that specific type
+        if ($type && strcasecmp($catRaw, trim($type)) !== 0) {
+            continue;
+        }
+
+        $cat = ucfirst($catRaw);
 
         if (!isset($groupedItems[$cat])) {
             $groupedItems[$cat] = [];
@@ -79,12 +117,11 @@ if ($formLoaded && $machineId) {
         $groupedItems[$cat][] = $item;
     }
 
-    // Uncomment for debugging
-    /*
-    echo "<div class='alert alert-info'>DEBUG: Found " . count($checkItems) . " items. <br>";
-    foreach($groupedItems as $k => $v) echo "$k: " . count($v) . " items<br>";
-    echo "</div>";
-    */
+    // Remove empty pre-defined categories if they are not the requested type
+    foreach (['Machine', 'Safety', 'Customer'] as $pre) {
+        if (empty($groupedItems[$pre]))
+            unset($groupedItems[$pre]);
+    }
 
     // Sort keys to ensure priority categories come first if needed.
 
@@ -114,14 +151,96 @@ if ($formLoaded && $machineId) {
     }
 
     $target_id = "m_" . $machineId;
-    $dupCheck = $pdo->prepare("SELECT COUNT(*) FROM check_sheets WHERE target_id = ? AND created_at BETWEEN ? AND ?");
-    $dupCheck->execute([$target_id, $shiftStart, $shiftEnd]);
+    $dupSql = "SELECT COUNT(*) FROM check_sheets WHERE target_id = ? AND created_at BETWEEN ? AND ?";
+    $dupParams = [$target_id, $shiftStart, $shiftEnd];
+    if ($type) {
+        $dupSql .= " AND check_type = ?";
+        $dupParams[] = $type;
+    } else {
+        $dupSql .= " AND (check_type = 'Daily' OR check_type IS NULL)";
+    }
+
+    $dupCheck = $pdo->prepare($dupSql);
+    $dupCheck->execute($dupParams);
     if ($dupCheck->fetchColumn() > 0) {
         $isDuplicate = true;
-        $duplicateMsg = "เครื่องจักรนี้ถูกลงข้อมูลสำหรับ $shiftLabel เรียบร้อยแล้ว ไม่สามารถลงซ้ำได้ หากต้องการแก้ไขกรุณาติดต่อ Leader";
+        $typeLabel = $type ? "หัวข้อ $type" : "ข้อมูลทั้งหมด";
+        $duplicateMsg = "เครื่องจักรนี้ถูกลงข้อมูลสำหรับ $typeLabel ใน $shiftLabel เรียบร้อยแล้ว ไม่สามารถลงซ้ำได้ หากต้องการแก้ไขกรุณาติดต่อ Leader";
     }
 }
 ?>
+<style>
+    /* Frequency Filter Styles */
+    .freq-filter-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+    }
+
+    .freq-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 50px;
+        border: 2px solid #dee2e6;
+        background: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #6c757d;
+        user-select: none;
+    }
+
+    .freq-chip:hover {
+        border-color: #0d6efd;
+        color: #0d6efd;
+        background: rgba(13, 110, 253, 0.04);
+    }
+
+    .freq-chip input[type="checkbox"] {
+        display: none;
+    }
+
+    .freq-chip.active {
+        background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+        color: #fff;
+        border-color: #0d6efd;
+        box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+    }
+
+    .freq-chip .chip-icon {
+        font-size: 0.7rem;
+    }
+
+    .check-row-hidden {
+        display: none !important;
+    }
+
+    .freq-counter {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        border-radius: 50px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        background: rgba(0, 0, 0, 0.1);
+        padding: 0 5px;
+    }
+
+    .freq-chip.active .freq-counter {
+        background: rgba(255, 255, 255, 0.3);
+    }
+</style>
 
 <?php if (!$formLoaded): ?>
     <!-- Step 1: Selection Form -->
@@ -207,35 +326,76 @@ if ($formLoaded && $machineId) {
                                     </div>
                                 </div>
                             <?php elseif (!isset($_GET['action'])): ?>
-                                <!-- MODE SELECTION CARDS -->
+                                <!-- MODE SELECTION CARDS - Now Categorized -->
                                 <div class="row g-3 mb-4">
-                                    <div class="col-md-6">
-                                        <a href="?machine_id=<?php echo $machineId; ?>&action=check" class="text-decoration-none">
-                                            <div class="card h-100 border-0 shadow-sm hover-shadow transition-all"
-                                                style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
-                                                <div class="card-body p-4 text-center text-white">
-                                                    <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                                                        style="width: 60px; height: 60px;">
-                                                        <i class="fas fa-clipboard-check fa-2x"></i>
+                                    <?php
+                                    // Fetch distinct categories for this machine
+                                    $stmt = $pdo->prepare("
+                                        SELECT DISTINCT ci.category 
+                                        FROM check_items ci 
+                                        INNER JOIN machine_check_items mci ON ci.id = mci.check_item_id 
+                                        WHERE mci.machine_id = ?
+                                    ");
+                                    $stmt->execute([$machineId]);
+                                    $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+                                    $categoryMap = [
+                                        'Safety' => ['name' => 'Safety', 'icon' => 'fa-shield-alt', 'color' => '#10b981'],
+                                        'Customer' => ['name' => 'Customer Requirement', 'icon' => 'fa-user-check', 'color' => '#f59e0b'],
+                                        'Machine' => ['name' => 'Machine', 'icon' => 'fa-cogs', 'color' => '#3b82f6'],
+                                        'Parameter' => ['name' => 'Parameter Check', 'icon' => 'fa-sliders-h', 'color' => '#8b5cf6'],
+                                        'Inspection' => ['name' => 'Visual Inspec', 'icon' => 'fa-search', 'color' => '#ec4899'],
+                                        'Tooling' => ['name' => 'Tooling Specific', 'icon' => 'fa-tools', 'color' => '#64748b'],
+                                        'Common' => ['name' => 'General Check', 'icon' => 'fa-clipboard-list', 'color' => '#6b7280']
+                                    ];
+
+                                    foreach ($categories as $cat):
+                                        $display = $categoryMap[$cat] ?? ['name' => $cat, 'icon' => 'fa-tasks', 'color' => '#4f46e5'];
+                                        ?>
+                                        <div class="col-6">
+                                            <a href="?machine_id=<?php echo $machineId; ?>&action=check&type=<?php echo urlencode($cat); ?>"
+                                                class="text-decoration-none">
+                                                <div class="card h-100 border-0 shadow-sm hover-shadow transition-all"
+                                                    style="background: <?php echo $display['color']; ?>;">
+                                                    <div class="card-body p-4 text-center text-white">
+                                                        <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-2"
+                                                            style="width: 50px; height: 50px;">
+                                                            <i class="fas <?php echo $display['icon']; ?> fa-lg"></i>
+                                                        </div>
+                                                        <h6 class="fw-bold mb-0"><?php echo $display['name']; ?></h6>
+                                                        <p class="small mb-0 opacity-75" style="font-size: 0.7rem;">Check</p>
                                                     </div>
-                                                    <h5 class="fw-bold mb-1">Check Sheet</h5>
-                                                    <p class="small mb-0 opacity-75">บันทึกการตรวจสอบเครื่องจักร</p>
                                                 </div>
-                                            </div>
-                                        </a>
-                                    </div>
-                                    <div class="col-md-6">
+                                            </a>
+                                        </div>
+                                    <?php endforeach; ?>
+
+                                    <?php if (empty($categories)): ?>
+                                        <div class="col-12">
+                                            <a href="?machine_id=<?php echo $machineId; ?>&action=check" class="text-decoration-none">
+                                                <div class="card h-100 border-0 shadow-sm hover-shadow transition-all"
+                                                    style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
+                                                    <div class="card-body p-4 text-center text-white">
+                                                        <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                                                            style="width: 60px; height: 60px;">
+                                                            <i class="fas fa-clipboard-check fa-2x"></i>
+                                                        </div>
+                                                        <h5 class="fw-bold mb-1">Check Sheet</h5>
+                                                        <p class="small mb-0 opacity-75">บันทึกการตรวจสอบเครื่องจักร</p>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="col-12 mt-2">
                                         <a href="downtime.php?report=1&machine_id=<?php echo $machineId; ?>"
                                             class="text-decoration-none">
                                             <div class="card h-100 border-0 shadow-sm hover-shadow transition-all"
                                                 style="background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);">
-                                                <div class="card-body p-4 text-center text-white">
-                                                    <div class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
-                                                        style="width: 60px; height: 60px;">
-                                                        <i class="fas fa-tools fa-2x"></i>
-                                                    </div>
-                                                    <h5 class="fw-bold mb-1">แจ้งซ่อม</h5>
-                                                    <p class="small mb-0 opacity-75">Report Downtime / Repair</p>
+                                                <div class="card-body p-3 text-center text-white">
+                                                    <i class="fas fa-tools me-2"></i>
+                                                    <span class="fw-bold">Report Repair / แจ้งซ่อม</span>
                                                 </div>
                                             </div>
                                         </a>
@@ -247,7 +407,19 @@ if ($formLoaded && $machineId) {
                             <?php else: ?>
                                 <!-- ACTION: CHECK - Show Employee Input -->
                                 <input type="hidden" name="action" value="check">
+                                <input type="hidden" name="type" value="<?php echo htmlspecialchars($type); ?>">
                                 <?php if (!$isDuplicate): ?>
+                                    <?php if (!empty($userError)): ?>
+                                        <div class="alert alert-danger rounded-4 shadow-sm border-0 mb-4">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-user-times fa-2x me-3"></i>
+                                                <div>
+                                                    <h6 class="fw-bold mb-0">Validation Error</h6>
+                                                    <p class="mb-0 small"><?php echo htmlspecialchars($userError); ?></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
                                     <div class="mb-4">
                                         <label class="form-label fw-bold"><i
                                                 class="fas fa-id-badge me-2 text-primary"></i>รหัสพนักงาน</label>
@@ -266,10 +438,10 @@ if ($formLoaded && $machineId) {
                             <?php endif; ?>
 
                         <?php else: ?>
-                            <!-- Standard Mode: Select Machine -->
+                            <!-- Standard Mode: Select Machine Only First -->
                             <div class="mb-4">
                                 <label class="form-label fw-bold"><i
-                                        class="fas fa-industry me-2 text-primary"></i>เลือกเครื่องจักร</label>
+                                        class="fas fa-industry me-2 text-primary"></i>เลือกเครื่องจักรเพื่อเริ่มการตรวจสอบ</label>
                                 <select class="form-select form-select-lg rounded-3 shadow-sm border-0 bg-light"
                                     name="machine_id" id="machineSelect" required>
                                     <option value="">-- เลือกเครื่องจักร --</option>
@@ -281,18 +453,9 @@ if ($formLoaded && $machineId) {
                                 </select>
                             </div>
 
-                            <!-- Standard mode proceeds directly to check -->
-                            <input type="hidden" name="action" value="check">
-                            <div class="mb-4">
-                                <label class="form-label fw-bold"><i
-                                        class="fas fa-id-badge me-2 text-primary"></i>รหัสพนักงาน</label>
-                                <input type="text" class="form-control form-control-lg rounded-3 shadow-sm border-0 bg-light"
-                                    name="employee_id" placeholder="กรอกรหัสพนักงาน (EN Number)" required>
-                            </div>
-
                             <div class="d-grid mt-5">
                                 <button type="submit" class="btn btn-primary btn-lg rounded-3 shadow-sm py-3 fw-bold">
-                                    ถัดไป <i class="fas fa-chevron-right ms-2 small"></i>
+                                    ถัดไป (Next) <i class="fas fa-chevron-right ms-2 small"></i>
                                 </button>
                             </div>
                         <?php endif; ?>
@@ -359,27 +522,71 @@ if ($formLoaded && $machineId) {
                     <form action="<?php echo BASE_URL; ?>actions/save_check.php" method="POST" id="checkSheetForm">
                         <input type="hidden" name="machine_id" value="<?php echo $machineId; ?>">
                         <input type="hidden" name="employee_id" value="<?php echo $employeeId; ?>">
+                        <input type="hidden" name="check_type" value="<?php echo $type ?: 'Daily'; ?>">
+
+                        <!-- Frequency Filter Checkboxes -->
+                        <?php if (!empty($availableFreqs)): ?>
+                            <div class="freq-filter-bar p-3 mb-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-filter text-primary me-2"></i>
+                                    <span class="fw-bold small text-uppercase text-dark">Frequency Filter</span>
+                                    <span class="ms-auto small text-muted" id="freqItemCount"></span>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2" id="freqFilterGroup">
+                                    <?php
+                                    $allFreqs = [
+                                        'shift' => ['label' => 'Shift', 'icon' => 'fas fa-sync-alt'],
+                                        'daily' => ['label' => 'Daily', 'icon' => 'fas fa-calendar-day'],
+                                        'weekly' => ['label' => 'Weekly', 'icon' => 'fas fa-calendar-week'],
+                                        'monthly' => ['label' => 'Monthly', 'icon' => 'fas fa-calendar-alt'],
+                                        '3_months' => ['label' => '3 Months', 'icon' => 'fas fa-calendar'],
+                                        '6_months' => ['label' => '6 Months', 'icon' => 'fas fa-calendar'],
+                                        'yearly' => ['label' => 'Yearly', 'icon' => 'fas fa-calendar-check'],
+                                    ];
+                                    foreach ($allFreqs as $fVal => $fInfo):
+                                        $hasItems = isset($availableFreqs[$fVal]);
+                                        if (!$hasItems)
+                                            continue;
+                                        $isDefault = ($fVal === 'daily');
+                                        ?>
+                                        <label class="freq-chip <?php echo $isDefault ? 'active' : ''; ?>" data-freq="<?php echo $fVal; ?>">
+                                            <input type="checkbox" class="freq-checkbox" value="<?php echo $fVal; ?>" <?php echo $isDefault ? 'checked' : ''; ?>>
+                                            <i class="chip-icon <?php echo $fInfo['icon']; ?>"></i>
+                                            <?php echo $fInfo['label']; ?>
+                                            <span class="freq-counter" data-freq-count="<?php echo $fVal; ?>">0</span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
                         <div class="card card-premium">
                             <div class="card-body p-4">
-                                <h5 class="fw-bold mb-3">All Check Items (<?php echo count($checkItems); ?> items)</h5>
+                                <h5 class="fw-bold mb-3"><?php echo $type ?: 'Daily'; ?> Check Items
+                                    (<?php echo count($checkItems); ?> items)</h5>
 
                                 <div class="table-responsive">
                                     <table class="table table-custom align-middle">
                                         <thead>
                                             <tr>
                                                 <th>Category</th>
-                                                <th>Code</th>
+                                                <th class="col-code">Code</th>
                                                 <th style="width: 40%;">Check Item</th>
                                                 <th class="text-center">Status</th>
                                                 <th>Remarks</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <?php foreach ($checkItems as $item): ?>
-                                                <tr>
+                                            <?php foreach ($checkItems as $item):
+                                                $itemFreq = $item['frequency'] ?: 'daily';
+                                                ?>
+                                                <tr class="check-item-row" data-frequency="<?php echo $itemFreq; ?>">
                                                     <td><span class="badge bg-secondary"><?php echo $item['category']; ?></span></td>
-                                                    <td class="fw-bold text-primary"><?php echo $item['item_code']; ?></td>
+                                                    <td class="fw-bold text-primary">
+                                                        <?php echo $item['item_code']; ?>
+                                                        <span class="badge bg-light text-dark border ms-1"
+                                                            style="font-size:0.6rem;"><?php echo str_replace('_', ' ', $itemFreq); ?></span>
+                                                    </td>
                                                     <td>
                                                         <div class="fw-semibold"><?php echo $item['name_en']; ?></div>
                                                         <small class="text-muted"><?php echo $item['name_th']; ?></small>
@@ -387,14 +594,14 @@ if ($formLoaded && $machineId) {
                                                     <td>
                                                         <div class="d-flex justify-content-center gap-3">
                                                             <div class="form-check form-check-inline">
-                                                                <input class="form-check-input" type="radio"
+                                                                <input class="form-check-input item-radio" type="radio"
                                                                     name="result[<?php echo $item['id']; ?>]"
                                                                     id="ok_<?php echo $item['id']; ?>" value="OK" required>
                                                                 <label class="form-check-label text-success fw-bold"
                                                                     for="ok_<?php echo $item['id']; ?>">OK</label>
                                                             </div>
                                                             <div class="form-check form-check-inline">
-                                                                <input class="form-check-input" type="radio"
+                                                                <input class="form-check-input item-radio" type="radio"
                                                                     name="result[<?php echo $item['id']; ?>]"
                                                                     id="ng_<?php echo $item['id']; ?>" value="NG">
                                                                 <label class="form-check-label text-danger fw-bold"
@@ -403,8 +610,12 @@ if ($formLoaded && $machineId) {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <input type="text" class="form-control form-control-sm"
-                                                            name="comment[<?php echo $item['id']; ?>]">
+                                                        <input type="text" class="form-control form-control-sm remark-input"
+                                                            name="comment[<?php echo $item['id']; ?>]"
+                                                            id="remark_<?php echo $item['id']; ?>"
+                                                            data-item-id="<?php echo $item['id']; ?>"
+                                                            data-item-code="<?php echo htmlspecialchars($item['item_code']); ?>"
+                                                            placeholder="กรอก Remark...">
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -427,6 +638,146 @@ if ($formLoaded && $machineId) {
     </div>
 <?php endif; ?>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('checkSheetForm');
+        if (!form) return;
 
+        // --- FILTER LOGIC ---
+        const chips = document.querySelectorAll('.freq-chip');
+        const checkboxes = document.querySelectorAll('.freq-checkbox');
+        const rows = document.querySelectorAll('.check-item-row');
+
+        if (chips.length > 0) {
+            function getSelectedFreqs() {
+                const selected = [];
+                checkboxes.forEach(cb => { if (cb.checked) selected.push(cb.value); });
+                return selected;
+            }
+
+            function applyFilter() {
+                const selected = getSelectedFreqs();
+                let totalVisible = 0;
+                const freqCounts = {};
+
+                // Count items per frequency
+                rows.forEach(row => {
+                    const freq = row.getAttribute('data-frequency');
+                    freqCounts[freq] = (freqCounts[freq] || 0) + 1;
+                });
+
+                // Update counters
+                document.querySelectorAll('[data-freq-count]').forEach(el => {
+                    const f = el.getAttribute('data-freq-count');
+                    el.textContent = freqCounts[f] || 0;
+                });
+
+                rows.forEach(row => {
+                    const freq = row.getAttribute('data-frequency');
+                    const isVisible = selected.includes(freq);
+
+                    if (isVisible) {
+                        row.classList.remove('check-row-hidden');
+                        totalVisible++;
+                        // Re-enable inputs
+                        row.querySelectorAll('.item-radio').forEach(r => {
+                            if (r.value === 'OK') r.setAttribute('required', 'required');
+                            r.removeAttribute('disabled');
+                        });
+                        row.querySelectorAll('.remark-input').forEach(c => c.removeAttribute('disabled'));
+                    } else {
+                        row.classList.add('check-row-hidden');
+                        // Disable inputs so they don't submit
+                        row.querySelectorAll('.item-radio').forEach(r => {
+                            r.removeAttribute('required');
+                            r.setAttribute('disabled', 'disabled');
+                        });
+                        row.querySelectorAll('.remark-input').forEach(c => c.setAttribute('disabled', 'disabled'));
+                    }
+                });
+
+                // Update item count display
+                const countEl = document.getElementById('freqItemCount');
+                if (countEl) {
+                    countEl.innerHTML = '<i class="fas fa-list-ol me-1"></i> ' + totalVisible + ' items';
+                }
+            }
+
+            // Chip click handler
+            chips.forEach(chip => {
+                chip.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const cb = this.querySelector('input[type="checkbox"]');
+                    cb.checked = !cb.checked;
+                    this.classList.toggle('active', cb.checked);
+                    applyFilter();
+                });
+            });
+
+            // Initial filter
+            applyFilter();
+        }
+
+        // --- VALIDATION AND INTERACTION LOGIC ---
+
+        // Listen to all radio button changes
+        form.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                // Extract item id from name: result[123] -> 123
+                const match = this.name.match(/result\[(\d+)\]/);
+                if (!match) return;
+                const itemId = match[1];
+                const remarkInput = document.getElementById('remark_' + itemId);
+                if (!remarkInput) return;
+
+                if (this.value === 'NG') {
+                    // Make remark required
+                    remarkInput.setAttribute('required', 'required');
+                    remarkInput.classList.add('border-danger', 'bg-danger-subtle');
+                    remarkInput.placeholder = '⚠️ กรุณาระบุปัญหาที่พบ (บังคับ)';
+                    remarkInput.focus();
+                } else {
+                    // Remove required
+                    remarkInput.removeAttribute('required');
+                    remarkInput.classList.remove('border-danger', 'bg-danger-subtle');
+                    remarkInput.placeholder = 'กรอก Remark...';
+                }
+            });
+        });
+
+        // Form submit validation
+        form.addEventListener('submit', function (e) {
+            const ngItems = form.querySelectorAll('input[type="radio"][value="NG"]:checked');
+            const missingRemarks = [];
+
+            ngItems.forEach(function (ngRadio) {
+                if (ngRadio.disabled) return; // Skip disabled items
+                const match = ngRadio.name.match(/result\[(\d+)\]/);
+                if (!match) return;
+                const itemId = match[1];
+                const remarkInput = document.getElementById('remark_' + itemId);
+                if (remarkInput && remarkInput.value.trim() === '') {
+                    const itemCode = remarkInput.getAttribute('data-item-code') || itemId;
+                    missingRemarks.push(itemCode);
+                    remarkInput.classList.add('border-danger', 'bg-danger-subtle');
+                }
+            });
+
+            if (missingRemarks.length > 0) {
+                e.preventDefault();
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรุณากรอก Remark สำหรับข้อที่ NG',
+                    html: '<div class="text-start"><p>รายการที่ยังไม่ได้กรอก Remark:</p><ul>' +
+                        missingRemarks.map(code => '<li class="text-danger fw-bold">' + code + '</li>').join('') +
+                        '</ul></div>',
+                    confirmButtonText: 'ตกลง',
+                    confirmButtonColor: '#4f46e5'
+                });
+                return false;
+            }
+        });
+    });
+</script>
 
 <?php include '../includes/footer.php'; ?>
